@@ -75,7 +75,7 @@ export class TreeNavigator {
 
   public onNodeHidden(id: NodeId) {
     // return focus to parent to avoid inconsistencies
-    if (id === this.lastFocused) {
+    if (id === this.lastFocused && this.hasTreeFocus()) {
       this.tryBlurCurrent();
       this.treeElem?.focus();
     }
