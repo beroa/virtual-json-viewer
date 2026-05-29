@@ -53,7 +53,7 @@ export function TreeViewer({
     [jsonLines],
   );
 
-  const { expandNodes } = useContext(SettingsContext);
+  const { expandNodes, indentation, sortKeys } = useContext(SettingsContext);
 
   // Tree walker for building the tree
   const walker = useMemo(
@@ -165,8 +165,12 @@ export function TreeViewer({
 
   // Keyboard navigation
   const navigate = useCallback(
-    (e: KeydownBufferEvent) => handleNavigation(parent, treeNavigator, e),
-    [parent, treeNavigator],
+    (e: KeydownBufferEvent) =>
+      handleNavigation(parent, treeNavigator, e, {
+        space: indentation,
+        sortKeys,
+      }),
+    [parent, treeNavigator, indentation, sortKeys],
   );
   const onKeydown = useKeydownBuffer(navigate, {
     bufferSize: 2,
@@ -238,6 +242,7 @@ function handleNavigation(
   treeElem: Nullable<HTMLElement>,
   tree: TreeNavigator,
   { last: e, text }: KeydownBufferEvent,
+  copyOptions: Json.ToStringOptions,
 ) {
   function from(navigate: (id: NodeId) => void) {
     const id = tree.getCurrentId();
@@ -263,13 +268,19 @@ function handleNavigation(
 
   if (e.key == "ArrowDown" || e.key == "j") {
     e.preventDefault();
-    from((id) => tree.gotoRowsOffset(id, 1));
+    from((id) =>
+      e.repeat ? tree.gotoRepeatedRowsOffset(id, 1) : tree.gotoRowsOffset(id, 1),
+    );
     return;
   }
 
   if (e.key == "ArrowUp" || e.key == "k") {
     e.preventDefault();
-    from((id) => tree.gotoRowsOffset(id, -1));
+    from((id) =>
+      e.repeat
+        ? tree.gotoRepeatedRowsOffset(id, -1)
+        : tree.gotoRowsOffset(id, -1),
+    );
     return;
   }
 
@@ -305,6 +316,12 @@ function handleNavigation(
     return;
   }
 
+  if (e.key == "y") {
+    e.preventDefault();
+    copyCurrentJsonBlock(tree, copyOptions);
+    return;
+  }
+
   // Open state
 
   if (e.key == "ArrowRight" || e.key == "l") {
@@ -324,4 +341,15 @@ function handleNavigation(
     from((id) => tree.toggleOpen(id));
     return;
   }
+}
+
+function copyCurrentJsonBlock(
+  tree: TreeNavigator,
+  opts: Json.ToStringOptions,
+) {
+  const value = tree.getCurrentBlockValue();
+  if (value === undefined) return;
+
+  const text = Json.toString(value, opts);
+  navigator.clipboard?.writeText(text);
 }

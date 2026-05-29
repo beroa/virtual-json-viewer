@@ -1,4 +1,5 @@
 import { SearchMatchHandler } from "@/viewer/components/RenderedText";
+import * as Json from "@/viewer/commons/Json";
 import { RefCurrent } from "@/viewer/hooks";
 import { SearchNavigation } from "@/viewer/state";
 import { NodeId, TreeHandler, TreeSnapshot } from "./Tree";
@@ -34,6 +35,10 @@ export class TreeNavigator {
   // Nodes navigation
   private handlerById: Map<NodeId, TreeNavigatorNodeHandler> = new Map();
   private lastFocused?: NodeId;
+  private repeatedRowNavigation: RepeatedRowNavigation = {
+    direction: null,
+    extraStep: false,
+  };
 
   // Search navigation
   private searchMatches: FlattenedSearchMatch[] = [];
@@ -116,6 +121,21 @@ export class TreeNavigator {
     }
   }
 
+  public gotoRepeatedRowsOffset(id: NodeId, rows: number) {
+    const direction = Math.sign(rows);
+    if (direction === 0) return;
+
+    if (this.repeatedRowNavigation.direction !== direction) {
+      this.repeatedRowNavigation = { direction, extraStep: false };
+    }
+
+    const extraStep = this.repeatedRowNavigation.extraStep ? direction : 0;
+    this.repeatedRowNavigation.extraStep =
+      !this.repeatedRowNavigation.extraStep;
+
+    this.gotoRowsOffset(id, rows + extraStep);
+  }
+
   public gotoPagesOffset(id: NodeId, pages: number) {
     const index = this.tree?.indexById(id);
     if (index !== undefined) {
@@ -156,6 +176,16 @@ export class TreeNavigator {
       this.setAnchor(this.tree.getByIndex(0).id);
       return this.lastFocused;
     }
+  }
+
+  public getCurrentBlockValue(): Json.Root | undefined {
+    const id = this.getCurrentId();
+    if (id === undefined) return undefined;
+
+    const node = this.tree?.get(id);
+    if (!node) return undefined;
+
+    return Json.isLeaf(node.value) ? node.parent?.value : node.value;
   }
 
   public snapshot(): TreeSnapshot | undefined {
@@ -362,6 +392,11 @@ export class TreeNavigator {
     }
   }
 }
+
+type RepeatedRowNavigation = {
+  direction: Nullable<number>;
+  extraStep: boolean;
+};
 
 function flattenSearchMatches(tree: TreeHandler): FlattenedSearchMatch[] {
   return tree
