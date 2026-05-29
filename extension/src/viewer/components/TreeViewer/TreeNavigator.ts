@@ -132,6 +132,18 @@ export class TreeNavigator {
     this.gotoIndex(this.tree.length() - 1);
   }
 
+  public gotoObjectBoundary(id: NodeId) {
+    const container = this.findBoundaryContainer(id);
+    if (!container?.children.length) return;
+
+    const firstChild = container.children[0];
+    const lastChild = container.children[container.children.length - 1];
+    const target = id === firstChild.id ? lastChild : firstChild;
+
+    this.open(container.id);
+    this.goto(target.id);
+  }
+
   public getCurrentId(): NodeId | undefined {
     if (
       this.lastFocused !== undefined &&
@@ -210,6 +222,17 @@ export class TreeNavigator {
     index = Math.max(0, Math.min(index, this.tree.length() - 1));
     const id = this.tree.getByIndex(index).id;
     this.goto(id);
+  }
+
+  private findBoundaryContainer(id: NodeId) {
+    const node = this.tree?.get(id);
+    if (!node) return;
+
+    if (!node.isLeaf) {
+      return node;
+    }
+
+    return node.parent ?? undefined;
   }
 
   private pageRows(): number {

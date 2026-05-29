@@ -299,6 +299,12 @@ function handleNavigation(
     return;
   }
 
+  if (e.key == "\\") {
+    e.preventDefault();
+    from((id) => tree.gotoObjectBoundary(id));
+    return;
+  }
+
   // Open state
 
   if (e.key == "ArrowRight" || e.key == "l") {
