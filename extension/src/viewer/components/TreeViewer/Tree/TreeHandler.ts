@@ -1,7 +1,8 @@
 import { RefCurrent } from "@/viewer/hooks";
 import { Align, ListImperativeAPI } from "react-window";
-import { NodeId, NodeState } from "./NodeState";
-import { TreeState } from "./TreeState";
+import { NodeId, NodeState, NodeWalkId } from "./NodeState";
+import { TreeSnapshot, TreeState } from "./TreeState";
+export type { TreeSnapshot } from "./TreeState";
 
 // context is any because it's not used in the handler
 export type TreeListCurrent = RefCurrent<ListImperativeAPI>;
@@ -33,8 +34,19 @@ export class TreeHandler {
     return this.tree.nodeById(id);
   }
 
+  public idByWalkId(walkId: NodeWalkId): NodeId | undefined {
+    return this.tree.idByWalkId(walkId);
+  }
+
   public iterAll(): Generator<NodeState> {
     return this.tree.iterAll();
+  }
+
+  public snapshot(focusedNodeId: NodeId | undefined): TreeSnapshot {
+    return this.tree.snapshot(
+      focusedNodeId,
+      this.list?.element?.scrollTop ?? 0,
+    );
   }
 
   // Openness
@@ -62,5 +74,9 @@ export class TreeHandler {
     if (0 <= index && index < this.tree.length()) {
       this.list?.scrollToRow({ index, align });
     }
+  }
+
+  public restoreScrollTop(scrollTop: number) {
+    this.list?.element?.scrollTo({ top: scrollTop });
   }
 }

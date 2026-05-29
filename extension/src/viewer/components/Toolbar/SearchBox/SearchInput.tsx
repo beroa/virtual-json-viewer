@@ -9,16 +9,35 @@ import {
 import { TranslationContext } from "@/viewer/localization";
 import { SettingsContext } from "@/viewer/state";
 import classNames from "classnames";
-import { FormEvent, JSX, useCallback, useContext, useEffect } from "react";
+import {
+  FormEvent,
+  JSX,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
 
 type SearchInputProps = Props<{
+  enableTreeEscape: boolean;
+  isCommitted: boolean;
+  isSearchCommitted: () => boolean;
+  hasSelectedMatch: boolean;
   text: string;
   setText: (text: string) => void;
+  clearPreview: () => void;
+  commitSearch: () => void;
 }>;
 
 export function SearchInput({
+  enableTreeEscape,
+  isCommitted,
+  isSearchCommitted,
+  hasSelectedMatch,
   text,
   setText,
+  clearPreview,
+  commitSearch,
   className,
 }: SearchInputProps): JSX.Element {
   const t = useContext(TranslationContext);
@@ -30,10 +49,11 @@ export function SearchInput({
   if (current) current.value = text;
 
   // debounce onChange event to wait until user stops typing
-  let timeoutId: Nullable<NodeJS.Timeout> = null;
+  const timeoutId = useRef<Nullable<NodeJS.Timeout>>(null);
 
   const maybeClearTimeout = () => {
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutId.current) clearTimeout(timeoutId.current);
+    timeoutId.current = null;
   };
 
   // clear timeout on component unmount
@@ -43,14 +63,47 @@ export function SearchInput({
   const onChange = (e: FormEvent<HTMLInputElement>) => {
     maybeClearTimeout();
     const text = (e.target as HTMLInputElement).value;
-    timeoutId = setTimeout(() => setText(text), searchDelay);
+    timeoutId.current = setTimeout(() => setText(text), searchDelay);
   };
 
-  // on Enter key press select next match
+  function flushText(): [text: string, changed: boolean] {
+    maybeClearTimeout();
+    const nextText = current?.value ?? "";
+    const changed = nextText !== text;
+    if (changed) {
+      setText(nextText);
+    }
+    return [nextText, changed];
+  }
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      dispatch(ViewerEventType.SearchNavigateNext);
+      const [nextText, textChanged] = flushText();
+      if (!nextText) return;
+
+      if (isCommitted && !textChanged) {
+        dispatch(
+          e.shiftKey
+            ? ViewerEventType.SearchNavigatePrevious
+            : ViewerEventType.SearchNavigateNext,
+        );
+      } else {
+        commitSearch();
+      }
+      return;
+    }
+
+    if (e.key === "Escape" && enableTreeEscape) {
+      e.preventDefault();
+      maybeClearTimeout();
+
+      if (isSearchCommitted() && hasSelectedMatch) {
+        dispatch(ViewerEventType.SearchFocusCurrentMatch);
+      } else {
+        if (current) current.value = "";
+        clearPreview();
+      }
     }
   };
 

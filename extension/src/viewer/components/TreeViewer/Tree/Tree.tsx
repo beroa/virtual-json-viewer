@@ -6,11 +6,12 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { List, useDynamicRowHeight, useListCallbackRef } from "react-window";
 import { TreeWalker } from "../TreeWalker";
-import { TreeHandler } from "./TreeHandler";
+import { TreeHandler, TreeSnapshot } from "./TreeHandler";
 import { TreeNodeComponent } from "./TreeNodeComponent";
 import { TreeRow, TreeRowProps } from "./TreeRow";
 import { TreeState } from "./TreeState";
@@ -21,7 +22,14 @@ export type TreeProps<Context> = {
   treeWalker: TreeWalker;
   context: Context;
   children: TreeNodeComponent<Context>;
+  restoreSnapshotRequest?: RestoreSnapshotRequest;
+  onRestoreSnapshotApplied?: () => void;
   ref?: Ref<TreeHandler>;
+};
+
+export type RestoreSnapshotRequest = {
+  id: number;
+  snapshot: TreeSnapshot;
 };
 
 export function Tree<Context>({
@@ -30,6 +38,8 @@ export function Tree<Context>({
   treeWalker,
   context,
   children: TreeNode,
+  restoreSnapshotRequest,
+  onRestoreSnapshotApplied,
   ref,
 }: TreeProps<Context>): JSX.Element {
   // TreeState is a reference to the mutable state of the tree.
@@ -37,7 +47,25 @@ export function Tree<Context>({
   // The underlying data structure is mutable, so any reference points to the latest state.
   const [treeState, setTreeState] = useState<TreeState>(() => new TreeState());
   useEffect(() => treeState.observeStateChange(setTreeState), []);
-  useEffect(() => treeState.load(treeWalker), [treeWalker]);
+  const lastLoad = useRef<{
+    restoreId?: number;
+    treeWalker?: TreeWalker;
+  }>({});
+  useEffect(() => {
+    const restoreId = restoreSnapshotRequest?.id;
+    const shouldLoad =
+      lastLoad.current.treeWalker !== treeWalker ||
+      (restoreId !== undefined && lastLoad.current.restoreId !== restoreId);
+
+    if (!shouldLoad) return;
+
+    treeState.load(treeWalker, restoreSnapshotRequest?.snapshot);
+    lastLoad.current = { treeWalker, restoreId };
+
+    if (restoreSnapshotRequest) {
+      onRestoreSnapshotApplied?.();
+    }
+  }, [treeState, treeWalker, restoreSnapshotRequest, onRestoreSnapshotApplied]);
 
   // Reference to the list component
   const [list, listRef] = useListCallbackRef(null);
@@ -52,6 +80,15 @@ export function Tree<Context>({
     [treeWalker, list],
   );
   useImperativeHandle(ref, () => handler, [handler]);
+
+  useEffect(() => {
+    if (!restoreSnapshotRequest || !list) return;
+
+    const timeoutId = setTimeout(() => {
+      list.element?.scrollTo({ top: restoreSnapshotRequest.snapshot.scrollTop });
+    });
+    return () => clearTimeout(timeoutId);
+  }, [list, restoreSnapshotRequest]);
 
   const rowProps: TreeRowProps<Context> = useMemo(
     () => ({ treeState, context, TreeNode }),

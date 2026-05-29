@@ -3,15 +3,23 @@ import { NodeId, NodeState, NodeWalkId } from "./NodeState";
 
 export type StateChangeCallback = (newState: TreeState) => void;
 
+export type TreeSnapshot = {
+  focusedWalkId?: NodeWalkId;
+  openWalkIds: Set<NodeWalkId>;
+  scrollTop: number;
+};
+
 export class TreeState {
   private nodes: NodeState[] = [];
   private visibleNodes: NodeId[] = [];
+  private nodeIdByWalkId: Map<NodeWalkId, NodeId> = new Map();
   private onStateChange: Nullable<StateChangeCallback> = null;
 
   private cloneRef(): TreeState {
     const newState = new TreeState();
     newState.nodes = this.nodes;
     newState.visibleNodes = this.visibleNodes;
+    newState.nodeIdByWalkId = this.nodeIdByWalkId;
     newState.onStateChange = this.onStateChange;
     return newState;
   }
@@ -19,6 +27,7 @@ export class TreeState {
   private resetState() {
     this.nodes = [];
     this.visibleNodes = [];
+    this.nodeIdByWalkId = new Map();
   }
 
   // Observers
@@ -63,6 +72,28 @@ export class TreeState {
     yield* this.nodes.values();
   }
 
+  public idByWalkId(walkId: NodeWalkId): NodeId | undefined {
+    return this.nodeIdByWalkId.get(walkId);
+  }
+
+  public snapshot(
+    focusedNodeId: NodeId | undefined,
+    scrollTop: number,
+  ): TreeSnapshot {
+    const focusedWalkId =
+      focusedNodeId === undefined
+        ? undefined
+        : this.nodeById(focusedNodeId)?.walkId;
+
+    return {
+      focusedWalkId,
+      openWalkIds: new Set(
+        this.nodes.filter((node) => node.isOpen).map((node) => node.walkId),
+      ),
+      scrollTop,
+    };
+  }
+
   // O(log(N))
   public indexById(id: NodeId): number {
     const arr = this.visibleNodes;
@@ -88,12 +119,13 @@ export class TreeState {
 
   // Initialization
 
-  public load(treeWalker: TreeWalker) {
+  public load(treeWalker: TreeWalker, snapshot?: TreeSnapshot) {
     // Reset state
     this.resetState();
 
     // Keep track of walked nodes to resolve parent relationships
     const walked = new Map<NodeWalkId, NodeId>();
+    const visible = new Set<NodeId>();
 
     // Keep track of the last visited node in each level
     const lastSiblings = new Map<NodeId | undefined, NodeState>();
@@ -112,7 +144,9 @@ export class TreeState {
         value: data.value,
         parent: parent,
         nesting: parent ? parent.nesting + 1 : 0,
-        isOpen: data.isOpenByDefault,
+        isOpen: snapshot
+          ? snapshot.openWalkIds.has(data.id)
+          : data.isOpenByDefault,
         searchMatch: data.searchMatch,
         // Forward relationships will be resolved by later iterations
         isLeaf: true,
@@ -122,9 +156,11 @@ export class TreeState {
 
       // Register the node in the state
       this.nodes.push(node);
-      const isVisible = !parent || parent.isOpen;
+      this.nodeIdByWalkId.set(node.walkId, node.id);
+      const isVisible = !parent || (visible.has(parent.id) && parent.isOpen);
       if (isVisible) {
         this.visibleNodes.push(node.id);
+        visible.add(node.id);
       }
 
       // Bind child to parent

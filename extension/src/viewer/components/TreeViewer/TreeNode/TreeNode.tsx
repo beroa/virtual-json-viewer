@@ -8,7 +8,7 @@ import {
   useReactiveRef,
 } from "@/viewer/hooks";
 import classNames from "classnames";
-import { JSX, useEffect } from "react";
+import { JSX, useEffect, useState } from "react";
 import { NodeSearchMatch, TreeNodeProps } from "../Tree";
 import { TreeContext } from "../TreeContext";
 import { NodePart, TreeNavigatorNodeHandler } from "../TreeNavigator";
@@ -27,6 +27,7 @@ export function TreeNode({
   const [key, keyRef] = useReactiveRef<KeyHandle>();
   const [value, valueRef] = useReactiveRef<ValueHandle>();
   const [enter, enterRef] = useReactiveRef<EnterButtonHandle>();
+  const [isAnchored, setAnchored] = useState(false);
 
   // Track DOM events
   const hasFocus = useFocus(parent);
@@ -49,6 +50,7 @@ export function TreeNode({
       blur() {
         parent.blur();
       },
+      setAnchored,
       getMatchHandler(part, index) {
         const ref = part === NodePart.Key ? key : value;
         return ref?.getMatchHandler(index);
@@ -77,8 +79,8 @@ export function TreeNode({
     <div
       ref={parentRef}
       className={classNames(
-        "focus:outline-viewer-foreground focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
         "hover:bg-viewer-focus",
+        { "bg-viewer-focus": isAnchored },
       )}
       style={{ ...style, paddingLeft: `${node.nesting}em` }}
       tabIndex={-1}

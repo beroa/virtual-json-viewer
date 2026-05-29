@@ -3,6 +3,10 @@ import * as Json from "@/viewer/commons/Json";
 export enum ViewerEventType {
   Expand = "expand",
   Collapse = "collapse",
+  SearchPreviewStarted = "search-preview-started",
+  SearchPreviewCancelled = "search-preview-cancelled",
+  SearchPreviewCommitted = "search-preview-committed",
+  SearchFocusCurrentMatch = "search-focus-current-match",
   SearchNavigatePrevious = "search-navigate-previous",
   SearchNavigateNext = "search-navigate-next",
   EnterNode = "enter-node",

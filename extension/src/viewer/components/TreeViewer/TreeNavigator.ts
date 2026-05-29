@@ -1,7 +1,7 @@
 import { SearchMatchHandler } from "@/viewer/components/RenderedText";
 import { RefCurrent } from "@/viewer/hooks";
 import { SearchNavigation } from "@/viewer/state";
-import { NodeId, TreeHandler } from "./Tree";
+import { NodeId, TreeHandler, TreeSnapshot } from "./Tree";
 
 export enum NodePart {
   Key = "key",
@@ -11,6 +11,7 @@ export enum NodePart {
 export interface TreeNavigatorNodeHandler {
   focus(): void;
   blur(): void;
+  setAnchored(anchored: boolean): void;
   listenOnFocus(callback: () => void): void;
   getMatchHandler(
     part: NodePart,
@@ -37,6 +38,7 @@ export class TreeNavigator {
   // Search navigation
   private searchMatches: FlattenedSearchMatch[] = [];
   private searchIndex: Nullable<number> = null;
+  private searchPreview = false;
   private onSearchNavigation?: SearchNavigationCallback;
 
   constructor(
@@ -53,11 +55,15 @@ export class TreeNavigator {
     this.handlerById.set(id, handler);
 
     // Listen to external focus event (e.g. by mouse click)
-    handler.listenOnFocus(() => (this.lastFocused = id));
+    handler.listenOnFocus(() => this.setAnchor(id));
+
+    if (this.lastFocused === undefined) {
+      this.setAnchor(this.getCurrentId());
+    }
 
     // Handle pending navigation
     if (id === this.lastFocused) {
-      this.tryFocusCurrent();
+      this.trySetAnchorCurrent(true);
     }
 
     // Handle previous search match selection
@@ -127,22 +133,56 @@ export class TreeNavigator {
   }
 
   public getCurrentId(): NodeId | undefined {
-    if (this.lastFocused !== undefined) {
+    if (
+      this.lastFocused !== undefined &&
+      this.tree?.indexById(this.lastFocused) !== -1
+    ) {
       return this.lastFocused;
     }
 
     if (this.tree?.length()) {
-      return this.tree.getByIndex(0).id;
+      this.setAnchor(this.tree.getByIndex(0).id);
+      return this.lastFocused;
+    }
+  }
+
+  public snapshot(): TreeSnapshot | undefined {
+    return this.tree?.snapshot(this.lastFocused);
+  }
+
+  public restoreFocusedNode(snapshot: TreeSnapshot) {
+    if (!snapshot.focusedWalkId) return;
+
+    const id = this.tree?.idByWalkId(snapshot.focusedWalkId);
+    if (id !== undefined) {
+      this.setAnchor(id);
     }
   }
 
   public goto(id: NodeId) {
     // manually mark the node as focused, because
     // the target html element could be outside the virtual list
-    this.lastFocused = id;
+    this.setAnchor(id);
 
     this.tree?.scrollTo(id);
     this.tryFocusCurrent();
+  }
+
+  private setAnchor(id: NodeId | undefined) {
+    if (id === undefined) return;
+    if (this.lastFocused === id) {
+      this.trySetAnchorCurrent(true);
+      return;
+    }
+
+    this.handlerById.get(this.lastFocused ?? -1)?.setAnchored(false);
+    this.lastFocused = id;
+    this.trySetAnchorCurrent(true);
+  }
+
+  private trySetAnchorCurrent(anchored: boolean) {
+    if (this.lastFocused === undefined) return;
+    this.handlerById.get(this.lastFocused)?.setAnchored(anchored);
   }
 
   private tryFocusCurrent() {
@@ -150,10 +190,19 @@ export class TreeNavigator {
     this.handlerById.get(this.lastFocused)?.focus();
   }
 
+  private focusTreeElement() {
+    this.treeElem?.focus();
+  }
+
+  private hasTreeFocus(): boolean {
+    const treeElem = this.treeElem;
+    const activeElement = document.activeElement;
+    return !!treeElem && !!activeElement && treeElem.contains(activeElement);
+  }
+
   private tryBlurCurrent() {
     if (this.lastFocused === undefined) return;
     this.handlerById.get(this.lastFocused)?.blur();
-    this.lastFocused = undefined;
   }
 
   private gotoIndex(index: number) {
@@ -175,16 +224,36 @@ export class TreeNavigator {
   public enableSearchNavigation(
     callback: SearchNavigationCallback,
     searchStartingIndex: number,
+    searchPreview: boolean,
   ) {
     if (!this.tree) return;
     this.onSearchNavigation = callback;
     this.searchMatches = flattenSearchMatches(this.tree);
+    this.searchPreview = searchPreview;
 
     if (this.searchMatches.length) {
       this.goToSearchIndex(searchStartingIndex);
     } else {
       this.notifySearchNavigation();
     }
+  }
+
+  public setSearchPreview(searchPreview: boolean) {
+    this.searchPreview = searchPreview;
+  }
+
+  public startSearchPreview() {
+    this.searchPreview = true;
+    this.trySelectCurrentSearchMatch();
+  }
+
+  public commitSearchPreview() {
+    this.searchPreview = false;
+    this.trySelectCurrentSearchMatch();
+  }
+
+  public cancelSearchPreview() {
+    this.searchPreview = false;
   }
 
   public goToPreviousSearchMatch() {
@@ -203,6 +272,7 @@ export class TreeNavigator {
     // Defensive boundaries check
     if (!this.tree?.length()) return;
     index = Math.max(0, Math.min(index, this.searchMatches.length - 1));
+    const preserveTreeFocus = this.hasTreeFocus();
 
     // Deselect previous match
     if (this.searchIndex !== null) {
@@ -222,12 +292,32 @@ export class TreeNavigator {
     // Select the match inside the node
     this.trySelectCurrentSearchMatch();
 
+    if (preserveTreeFocus) {
+      this.setAnchor(nodeId);
+      this.tryFocusCurrent();
+      setTimeout(() => this.tryFocusCurrent());
+    } else {
+      this.setAnchor(nodeId);
+    }
+
     // Notify the change
     this.notifySearchNavigation();
   }
 
+  public focusCurrentSearchMatch() {
+    const nodeId = this.searchMatches[this.searchIndex ?? -1]?.nodeId;
+    if (nodeId === undefined) return;
+
+    this.setAnchor(nodeId);
+    this.tree?.scrollTo(nodeId, "center");
+    this.focusTreeElement();
+    this.tryFocusCurrent();
+    setTimeout(() => this.tryFocusCurrent());
+  }
+
   private trySelectCurrentSearchMatch() {
     if (this.searchIndex === null) return;
+    if (this.searchPreview) return;
     const handler = this.getSearchHandler(this.searchIndex);
     handler?.setSelected(true);
   }

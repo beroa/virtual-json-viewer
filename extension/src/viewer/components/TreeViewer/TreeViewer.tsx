@@ -15,8 +15,16 @@ import {
 } from "@/viewer/hooks";
 import { Search, SearchNavigation, SettingsContext } from "@/viewer/state";
 import classNames from "classnames";
-import { JSX, useCallback, useContext, useEffect, useMemo } from "react";
-import { NodeId, Tree, TreeHandler } from "./Tree";
+import {
+  JSX,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { NodeId, RestoreSnapshotRequest, Tree, TreeHandler } from "./Tree";
 import { TreeContext } from "./TreeContext";
 import { TreeNavigator } from "./TreeNavigator";
 import { TreeNode } from "./TreeNode";
@@ -86,6 +94,75 @@ export function TreeViewer({
     [tree, parent],
   );
 
+  const snapshotRequestId = useRef(0);
+  const searchPreviewActive = useRef(false);
+  const previewSnapshot = useRef<
+    RestoreSnapshotRequest["snapshot"] | undefined
+  >(undefined);
+  const [restoreSnapshotRequest, setRestoreSnapshotRequest] =
+    useState<RestoreSnapshotRequest | undefined>(undefined);
+
+  const saveSearchPreviewSnapshot = useCallback(() => {
+    if (!searchPreviewActive.current) {
+      previewSnapshot.current = treeNavigator.snapshot();
+    }
+    searchPreviewActive.current = true;
+    treeNavigator.startSearchPreview();
+  }, [treeNavigator]);
+  useEventBusListener(
+    ViewerEventType.SearchPreviewStarted,
+    saveSearchPreviewSnapshot,
+  );
+
+  const restoreSearchPreviewSnapshot = useCallback(() => {
+    searchPreviewActive.current = false;
+    treeNavigator.cancelSearchPreview();
+    if (!previewSnapshot.current) return;
+
+    setRestoreSnapshotRequest({
+      id: ++snapshotRequestId.current,
+      snapshot: previewSnapshot.current,
+    });
+    previewSnapshot.current = undefined;
+  }, [treeNavigator]);
+  useEventBusListener(
+    ViewerEventType.SearchPreviewCancelled,
+    restoreSearchPreviewSnapshot,
+  );
+
+  const commitSearchPreview = useCallback(() => {
+    searchPreviewActive.current = false;
+    treeNavigator.commitSearchPreview();
+    previewSnapshot.current = undefined;
+  }, [treeNavigator]);
+  useEventBusListener(
+    ViewerEventType.SearchPreviewCommitted,
+    commitSearchPreview,
+  );
+
+  const focusCurrentSearchMatch = useCallback(
+    () => treeNavigator.focusCurrentSearchMatch(),
+    [treeNavigator],
+  );
+  useEventBusListener(
+    ViewerEventType.SearchFocusCurrentMatch,
+    focusCurrentSearchMatch,
+  );
+
+  const clearRestoreSnapshotRequest = useCallback(() => {
+    if (restoreSnapshotRequest) {
+      treeNavigator.restoreFocusedNode(restoreSnapshotRequest.snapshot);
+      setRestoreSnapshotRequest(undefined);
+    }
+  }, [restoreSnapshotRequest, treeNavigator]);
+
+  useEffect(() => {
+    if (!search.text && !restoreSnapshotRequest) {
+      searchPreviewActive.current = false;
+      previewSnapshot.current = undefined;
+    }
+  }, [search.text, restoreSnapshotRequest]);
+
   // Keyboard navigation
   const navigate = useCallback(
     (e: KeydownBufferEvent) => handleNavigation(parent, treeNavigator, e),
@@ -121,6 +198,7 @@ export function TreeViewer({
     treeNavigator.enableSearchNavigation(
       setSearchNavigation,
       searchStartingIndex,
+      searchPreviewActive.current,
     );
   }, [treeNavigator]);
 
@@ -134,7 +212,10 @@ export function TreeViewer({
   return (
     <div
       ref={parentRef}
-      className={classNames(className, "relative")}
+      className={classNames(
+        className,
+        "focus:outline-viewer-foreground relative focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
+      )}
       tabIndex={0}
       onKeyDown={onKeydown}
     >
@@ -144,6 +225,8 @@ export function TreeViewer({
         treeWalker={walker}
         ref={treeRef}
         context={context}
+        restoreSnapshotRequest={restoreSnapshotRequest}
+        onRestoreSnapshotApplied={clearRestoreSnapshotRequest}
       >
         {TreeNode}
       </Tree>
