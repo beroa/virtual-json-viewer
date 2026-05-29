@@ -44,6 +44,8 @@ Rightful question, and the answer is quite simple: the others weren't good enoug
 
 🍏 On MacOS `Ctrl` is replaced by the command key (`⌘`)
 
+Tree navigation is centered on the current row. The current row remains visible while searching; pressing `Escape` from a committed search moves focus to the current search match so tree navigation can continue from there. If the search text has not been committed yet, `Escape` clears the preview search and restores the tree to its previous expanded/collapsed state.
+
 ##### Navigate UI
 
 | Action                       | Primary              | Secondary         |
@@ -66,6 +68,15 @@ Rightful question, and the answer is quite simple: the others weren't good enoug
 | Go to next search match      | `Ctrl + g`           | `n`               |
 | Go to previous search match  | `Ctrl + Shift + g`   | `Shift + n`       |
 
+##### Search input
+
+| Action                                           | Primary              | Secondary         |
+|--------------------------------------------------|:--------------------:|:-----------------:|
+| Commit search or go to next committed match      | `Enter`              |                   |
+| Go to previous committed match                   | `Shift + Enter`      |                   |
+| Focus current match in tree                      | `Escape`             |                   |
+| Clear uncommitted search preview                 | `Escape`             |                   |
+
 ##### Tree viewer
 
 | Action                       | Primary              | Secondary         |
@@ -78,9 +89,11 @@ Rightful question, and the answer is quite simple: the others weren't good enoug
 | Go to previous page          | `PageUp`             | `Shift + k`       |
 | Go to first                  | `Home`               | `gg`              |
 | Go to last                   | `End`                | `Shift + g`       |
+| Go to object first/last key  | `\`                  |                   |
 | Open node                    | `ArrowRight`         | `l`               |
 | Close node                   | `ArrowLeft`          | `h`               |
 | Toggle node open/close       | `Spacebar`           |                   |
+| Copy current JSON block      | `y`                  |                   |
 | Enter node (requires JQ)     | `Enter`              |                   |
 | Select key text              | `Shift + ArrowLeft`  | `Shift + h`       |
 | Select value text            | `Shift + ArrowRight` | `Shift + l`       |

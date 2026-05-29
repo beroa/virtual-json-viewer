@@ -31,11 +31,9 @@ export function useJQ(
         if (mutex.hasLock()) {
           setJQ(jqCurrent);
         }
-      } catch {
+      } catch (error) {
         if (mutex.hasLock()) {
-          console.warn(
-            "Unable to load JQ, Wasm is probably disabled due to CSP. For additional info: https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md",
-          );
+          logJQLoadFailure(error);
           setJQ(null);
         }
       }
@@ -98,4 +96,23 @@ function loadJQ(): Promise<JQ> {
 
 function devNull(_message: string) {
   // do nothing
+}
+
+function logJQLoadFailure(error: unknown) {
+  if (isWasmCspError(error)) {
+    console.debug(
+      "JQ disabled: this page's Content Security Policy blocks WebAssembly.",
+      error,
+    );
+    return;
+  }
+
+  console.warn("Unable to load JQ.", error);
+}
+
+function isWasmCspError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /content security policy|csp|unsafe-eval|wasm code generation|webassembly.*disallowed|compile.*webassembly.*disallowed/i.test(
+    message,
+  );
 }
