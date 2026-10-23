@@ -1,3 +1,4 @@
+import { SYNTAX_TYPE } from "./JsonSyntax";
 import { LINK_TYPE } from "./LinkifiedText";
 import { MatchesResult } from "./Matcher";
 import { AnyMatch, NodeBuilder, RenderedNode } from "./RenderedNode";
@@ -17,7 +18,11 @@ export function renderMatches(
   text: string,
   matches: MatchesResult,
 ): RenderedMatchesResult {
-  const allMatches = [...matches.searchMatches, ...matches.linkMatches];
+  const allMatches = [
+    ...(matches.syntaxMatches ?? []),
+    ...matches.searchMatches,
+    ...matches.linkMatches,
+  ];
 
   if (!allMatches.length) {
     return { nodes: [text], searchMatches: [] };
@@ -124,6 +129,7 @@ type Edge = {
 // lower priority types are used as outermost tags
 // e.g. links should wrap mark tags
 const TYPE_PRIORITY = {
+  [SYNTAX_TYPE]: -1,
   [LINK_TYPE]: 0,
   [SEARCH_TYPE]: 1,
 };

@@ -1,4 +1,6 @@
 import { JSX } from "react";
+import { HexColorPreview } from "../HexColorPreview";
+import { SYNTAX_TYPE, SyntaxMatch } from "./JsonSyntax";
 import { LINK_TYPE, LinkifiedText, LinkMatch } from "./LinkifiedText";
 import { SearchMatchHandler } from "./Renderer";
 import {
@@ -8,12 +10,13 @@ import {
   SearchMatch,
 } from "./SearchedText";
 
-export type AnyMatch = SearchMatch | LinkMatch;
+export type AnyMatch = SearchMatch | LinkMatch | SyntaxMatch;
 
 export type RenderedNode = string | JSX.Element;
 
 export class NodeBuilder {
   private searchMatches: SearchMatchHandler[];
+  private previewedMatches = new Set<string>();
   private buildSearchNode: SearchNodeBuilder;
   private buildLinkNode: LinkNodeBuilder;
 
@@ -24,6 +27,24 @@ export class NodeBuilder {
 
   public fromMatch(match: AnyMatch, children: RenderedNode[]): RenderedNode {
     switch (match.type) {
+      case SYNTAX_TYPE: {
+        // Overlapping search matches can split a token into multiple spans.
+        const showPreview =
+          match.metadata.hexColor && !this.previewedMatches.has(match.id);
+        if (showPreview) this.previewedMatches.add(match.id);
+        return (
+          <span
+            key={match.id}
+            className={`${match.metadata.className} in-[mark]:text-inherit`}
+          >
+            {showPreview && (
+              <HexColorPreview color={match.metadata.hexColor!} />
+            )}
+            {children}
+          </span>
+        );
+      }
+
       case SEARCH_TYPE:
         return this.buildSearchNode(match, children);
 

@@ -8,6 +8,7 @@ import {
   RenderedText,
   SearchMatchHandler,
 } from "../RenderedText";
+import { matchJsonSyntax } from "../RenderedText/JsonSyntax";
 
 export type RenderedLinesProps = {
   rawLines: string[];
@@ -116,5 +117,6 @@ function findMatches(
   return {
     searchMatches,
     linkMatches,
+    syntaxMatches: matchJsonSyntax(text),
   };
 }

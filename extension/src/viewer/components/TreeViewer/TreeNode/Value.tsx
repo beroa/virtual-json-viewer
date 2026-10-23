@@ -1,6 +1,10 @@
 import * as DOM from "@/viewer/commons/Dom";
 import * as Json from "@/viewer/commons/Json";
 import { SearchMatchRange } from "@/viewer/commons/Searcher";
+import {
+  HexColorPreview,
+  isHexColor,
+} from "@/viewer/components/HexColorPreview";
 import classNames from "classnames";
 import { JSX, Ref, useImperativeHandle, useRef } from "react";
 import { NodeState } from "../Tree";
@@ -106,6 +110,9 @@ export function LiteralValue({
 
   return (
     <span className={classNames("whitespace-pre-wrap", textColor, className)}>
+      {isString && isHexColor(textValue) && (
+        <HexColorPreview color={textValue} />
+      )}
       {isString && <span>&quot;</span>}
       <span ref={outerRef}>
         <RenderedTextFromSearch
