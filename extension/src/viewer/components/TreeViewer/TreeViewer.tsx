@@ -1,5 +1,9 @@
 import * as DOM from "@/viewer/commons/Dom";
-import { ViewerEventType } from "@/viewer/commons/EventBus";
+import {
+  ViewerEventType,
+  shouldHandleViewerEvent,
+} from "@/viewer/commons/EventBus";
+import { DiffByPath } from "@/viewer/commons/Diff";
 import * as Json from "@/viewer/commons/Json";
 import {
   CHORD_KEY,
@@ -36,7 +40,16 @@ export type TreeViewerProps = Props<{
   search: Search;
   setSearchNavigation: SetValue<SearchNavigation>;
   searchStartingIndex: number;
+  showParentKeys?: boolean;
+  viewerId?: string;
+  diffByPath?: DiffByPath;
+  onScrollElementChange?: (element: Nullable<HTMLElement>) => void;
 }>;
+
+type ParentKey = {
+  key: Json.Key;
+  nesting: number;
+};
 
 export function TreeViewer({
   jsonLines,
@@ -44,6 +57,10 @@ export function TreeViewer({
   search,
   setSearchNavigation,
   searchStartingIndex,
+  showParentKeys = false,
+  viewerId = "main",
+  diffByPath,
+  onScrollElementChange,
   className,
 }: TreeViewerProps): JSX.Element {
   // Single line -> shown on its own
@@ -64,6 +81,7 @@ export function TreeViewer({
   // Imperative reference to manipulate the tree.
   // It changes when the content is (re)loaded.
   const [tree, treeRef] = useReactiveRef<TreeHandler>();
+  const [parentKeys, setParentKeys] = useState<ParentKey[]>([]);
 
   // Track tree element size
   const [parent, parentRef] = useReactiveRef<HTMLDivElement>();
@@ -90,7 +108,19 @@ export function TreeViewer({
 
   // Tree Navigator
   const treeNavigator = useMemo(
-    () => new TreeNavigator(tree, parent),
+    () =>
+      new TreeNavigator(tree, parent, (id) => {
+        const node = tree?.get(id);
+        const keys: ParentKey[] = [];
+        let ancestor = node?.parent;
+        while (ancestor) {
+          if (ancestor.key !== null) {
+            keys.unshift({ key: ancestor.key, nesting: ancestor.nesting });
+          }
+          ancestor = ancestor.parent;
+        }
+        setParentKeys(keys);
+      }),
     [tree, parent],
   );
 
@@ -141,8 +171,11 @@ export function TreeViewer({
   );
 
   const focusCurrentSearchMatch = useCallback(
-    () => treeNavigator.focusCurrentSearchMatch(),
-    [treeNavigator],
+    (event: Event) => {
+      if (!shouldHandleViewerEvent(event, viewerId)) return;
+      treeNavigator.focusCurrentSearchMatch();
+    },
+    [treeNavigator, viewerId],
   );
   useEventBusListener(
     ViewerEventType.SearchFocusCurrentMatch,
@@ -179,8 +212,11 @@ export function TreeViewer({
 
   // Search navigation
   const goToPreviousMatch = useCallback(
-    () => treeNavigator.goToPreviousSearchMatch(),
-    [treeNavigator],
+    (event: Event) => {
+      if (!shouldHandleViewerEvent(event, viewerId)) return;
+      treeNavigator.goToPreviousSearchMatch();
+    },
+    [treeNavigator, viewerId],
   );
   useEventBusListener(
     ViewerEventType.SearchNavigatePrevious,
@@ -188,8 +224,11 @@ export function TreeViewer({
   );
 
   const goToNextMatch = useCallback(
-    () => treeNavigator.goToNextSearchMatch(),
-    [treeNavigator],
+    (event: Event) => {
+      if (!shouldHandleViewerEvent(event, viewerId)) return;
+      treeNavigator.goToNextSearchMatch();
+    },
+    [treeNavigator, viewerId],
   );
   useEventBusListener(ViewerEventType.SearchNavigateNext, goToNextMatch);
 
@@ -208,8 +247,8 @@ export function TreeViewer({
 
   // Tree context for nodes
   const context: TreeContext = useMemo(
-    () => ({ tree: treeNavigator, enableEnterNode }),
-    [treeNavigator, enableEnterNode],
+    () => ({ tree: treeNavigator, enableEnterNode, viewerId, diffByPath }),
+    [treeNavigator, enableEnterNode, viewerId, diffByPath],
   );
 
   // Wrap the Tree in a div to handle resize, focus and navigation
@@ -218,7 +257,7 @@ export function TreeViewer({
       ref={parentRef}
       className={classNames(
         className,
-        "focus:outline-viewer-foreground relative focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
+        "focus:outline-viewer-foreground relative h-full overflow-hidden focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
       )}
       tabIndex={0}
       onKeyDown={onKeydown}
@@ -231,9 +270,23 @@ export function TreeViewer({
         context={context}
         restoreSnapshotRequest={restoreSnapshotRequest}
         onRestoreSnapshotApplied={clearRestoreSnapshotRequest}
+        onScrollElementChange={onScrollElementChange}
       >
         {TreeNode}
       </Tree>
+      {showParentKeys && parentKeys.length > 0 && (
+        <div className="bg-viewer-background text-json-key border-toolbar-foreground/20 pointer-events-none absolute top-0 right-0 left-0 z-10 border-b py-1 shadow-sm">
+          {parentKeys.map(({ key, nesting }, index) => (
+            <div
+              key={index}
+              className="whitespace-pre-wrap"
+              style={{ paddingLeft: `calc(${nesting}em + 1.375rem)` }}
+            >
+              {key}:
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

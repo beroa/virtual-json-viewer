@@ -1,5 +1,6 @@
 export * from "../../options/components/Select";
 export * from "./Alert";
+export * from "./DiffViewer";
 export * as Icon from "./Icon";
 export * from "./IconButton";
 export * from "./IconLabel";

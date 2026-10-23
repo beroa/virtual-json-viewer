@@ -12,6 +12,7 @@ import classNames from "classnames";
 import { JSX, useCallback, useContext } from "react";
 
 export type SearchNavigationPanelProps = Props<{
+  viewerId?: string;
   currentIndex: Nullable<number>;
   isCommitted: boolean;
   commitSearch: () => void;
@@ -19,6 +20,7 @@ export type SearchNavigationPanelProps = Props<{
 }>;
 
 export function SearchNavigationPanel({
+  viewerId,
   className,
   currentIndex,
   isCommitted,
@@ -35,7 +37,7 @@ export function SearchNavigationPanel({
       ) {
         e.preventDefault();
         commitSearch();
-        dispatch(ViewerEventType.SearchNavigatePrevious);
+        dispatch(ViewerEventType.SearchNavigatePrevious, viewerId);
         return;
       }
 
@@ -45,7 +47,7 @@ export function SearchNavigationPanel({
       ) {
         e.preventDefault();
         commitSearch();
-        dispatch(ViewerEventType.SearchNavigateNext);
+        dispatch(ViewerEventType.SearchNavigateNext, viewerId);
         return;
       }
     },
@@ -61,12 +63,12 @@ export function SearchNavigationPanel({
 
   const navigatePrevious = () => {
     commitSearch();
-    dispatch(ViewerEventType.SearchNavigatePrevious);
+    dispatch(ViewerEventType.SearchNavigatePrevious, viewerId);
   };
 
   const navigateNext = () => {
     commitSearch();
-    dispatch(ViewerEventType.SearchNavigateNext);
+    dispatch(ViewerEventType.SearchNavigateNext, viewerId);
   };
 
   return (

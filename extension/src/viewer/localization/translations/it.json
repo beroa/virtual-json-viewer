@@ -121,6 +121,10 @@
     },
     "expand": "Espandi",
     "collapse": "Chiudi",
+    "parents": {
+      "show": "Mostra chiavi padre",
+      "hide": "Nascondi chiavi padre"
+    },
     "save": "Salva",
     "search": {
       "clear": "Cancella",
@@ -148,6 +152,14 @@
       },
       "run": "Esegui il comando",
       "genericError": "Comando JQ fallito"
+    },
+    "compare": {
+      "placeholder": "Confronta con URL",
+      "run": "Confronta",
+      "loading": "Caricamento...",
+      "clear": "Chiudi diff",
+      "show": "Mostra confronto",
+      "hide": "Nascondi confronto"
     }
   }
 }

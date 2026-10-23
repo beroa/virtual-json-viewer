@@ -1,3 +1,4 @@
+import { DiffKind } from "@/viewer/commons/Diff";
 import * as DOM from "@/viewer/commons/Dom";
 import {
   CHORD_KEY,
@@ -18,7 +19,7 @@ import { OpenButton } from "./OpenButton";
 import { Value, ValueHandle } from "./Value";
 
 export function TreeNode({
-  context: { tree, enableEnterNode },
+  context: { tree, enableEnterNode, diffByPath },
   node,
   style,
 }: TreeNodeProps<TreeContext>): JSX.Element {
@@ -74,6 +75,7 @@ export function TreeNode({
   };
 
   const fade = { "opacity-60": !inSearchMatchPath(node.searchMatch) };
+  const diffClassName = resolveDiffClassName(diffByPath?.[node.walkId] ?? null);
 
   return (
     <div
@@ -81,6 +83,7 @@ export function TreeNode({
       className={classNames(
         "hover:bg-viewer-focus",
         { "bg-viewer-focus": isAnchored },
+        diffClassName,
       )}
       style={{ ...style, paddingLeft: `${node.nesting}em` }}
       tabIndex={-1}
@@ -114,6 +117,21 @@ export function TreeNode({
       </div>
     </div>
   );
+}
+
+function resolveDiffClassName(kind: Nullable<DiffKind>): string | undefined {
+  switch (kind) {
+    case DiffKind.Added:
+      return "bg-emerald-500/12";
+    case DiffKind.Removed:
+      return "bg-red-500/12";
+    case DiffKind.TypeChanged:
+      return "bg-orange-500/12";
+    case DiffKind.Changed:
+      return "bg-amber-500/12";
+    default:
+      return undefined;
+  }
 }
 
 function inSearchMatchPath(searchMatch: Nullable<NodeSearchMatch>): boolean {

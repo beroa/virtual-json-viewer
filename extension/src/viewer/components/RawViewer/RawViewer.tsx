@@ -1,5 +1,9 @@
 import * as DOM from "@/viewer/commons/Dom";
-import { ViewerEventType } from "@/viewer/commons/EventBus";
+import {
+  ViewerEventType,
+  shouldHandleViewerEvent,
+} from "@/viewer/commons/EventBus";
+import { RawDiffLine } from "@/viewer/commons/Diff";
 import * as Json from "@/viewer/commons/Json";
 import {
   CHORD_KEY,
@@ -29,6 +33,9 @@ export type RawViewerProps = Props<{
   setSearchNavigation: SetValue<SearchNavigation>;
   searchStartingIndex: number;
   isLargeJson: boolean;
+  viewerId?: string;
+  displayLines?: RawDiffLine[];
+  onScrollElementChange?: (element: Nullable<HTMLElement>) => void;
 }>;
 
 export function RawViewer({
@@ -37,6 +44,9 @@ export function RawViewer({
   isLargeJson,
   setSearchNavigation,
   searchStartingIndex,
+  viewerId = "main",
+  displayLines,
+  onScrollElementChange,
   className,
 }: RawViewerProps): JSX.Element {
   const { indentation, sortKeys } = useContext(SettingsContext);
@@ -60,14 +70,19 @@ export function RawViewer({
     () => jsonLines.map((line) => Json.toString(line, { sortKeys, space })),
     [jsonLines, sortKeys, space],
   );
+  const renderedLines = displayLines ?? undefined;
+  const effectiveRawLines = renderedLines?.map((line) => line.text) ?? rawLines;
 
   // Navigation
   const navigator = useRef<SearchMatchNavigator>(new SearchMatchNavigator());
   navigator.current.observeNavigation(setSearchNavigation);
 
   const goToPreviousMatch = useCallback(
-    () => navigator.current.goToPreviousMatch(),
-    [navigator],
+    (event: Event) => {
+      if (!shouldHandleViewerEvent(event, viewerId)) return;
+      navigator.current.goToPreviousMatch();
+    },
+    [navigator, viewerId],
   );
   useEventBusListener(
     ViewerEventType.SearchNavigatePrevious,
@@ -75,13 +90,21 @@ export function RawViewer({
   );
 
   const goToNextMatch = useCallback(
-    () => navigator.current.goToNextMatch(),
-    [navigator],
+    (event: Event) => {
+      if (!shouldHandleViewerEvent(event, viewerId)) return;
+      navigator.current.goToNextMatch();
+    },
+    [navigator, viewerId],
   );
   useEventBusListener(ViewerEventType.SearchNavigateNext, goToNextMatch);
 
   // Register shortcuts
   const ref = useRef<Nullable<HTMLDivElement>>(null);
+  useEffect(() => {
+    onScrollElementChange?.(ref.current);
+    return () => onScrollElementChange?.(null);
+  }, [onScrollElementChange]);
+
   const handleNavigation = useCallback(
     (e: KeydownEvent) => {
       if (e[CHORD_KEY] && e.key === "0") {
@@ -107,7 +130,7 @@ export function RawViewer({
     }
   };
 
-  const wrap = minify ? "break-all" : "whitespace-pre";
+  const wrap = minify ? "break-all" : "whitespace-pre-wrap break-words";
 
   // Reset the navigator when search matches change.
   // Starting index is not a dependency, because it must not trigger a reset.
@@ -124,12 +147,13 @@ export function RawViewer({
     <div
       ref={ref}
       tabIndex={0}
-      className={classNames("overflow-auto", wrap, className)}
+      className={classNames("h-full overflow-auto", wrap, className)}
       spellCheck={false}
       onKeyDown={handleSelectAll}
     >
       <RenderedLines
-        rawLines={rawLines}
+        rawLines={renderedLines ? undefined : effectiveRawLines}
+        lines={renderedLines}
         search={search}
         linkifyUrls={linkifyUrls}
         onSearchMatchesUpdate={setSearchMatches}

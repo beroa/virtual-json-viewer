@@ -1,3 +1,4 @@
+import { DIFF_TYPE } from "./DiffText";
 import { LINK_TYPE } from "./LinkifiedText";
 import { MatchesResult } from "./Matcher";
 import { AnyMatch, NodeBuilder, RenderedNode } from "./RenderedNode";
@@ -17,7 +18,11 @@ export function renderMatches(
   text: string,
   matches: MatchesResult,
 ): RenderedMatchesResult {
-  const allMatches = [...matches.searchMatches, ...matches.linkMatches];
+  const allMatches = [
+    ...matches.diffMatches,
+    ...matches.searchMatches,
+    ...matches.linkMatches,
+  ];
 
   if (!allMatches.length) {
     return { nodes: [text], searchMatches: [] };
@@ -124,8 +129,9 @@ type Edge = {
 // lower priority types are used as outermost tags
 // e.g. links should wrap mark tags
 const TYPE_PRIORITY = {
-  [LINK_TYPE]: 0,
-  [SEARCH_TYPE]: 1,
+  [DIFF_TYPE]: 0,
+  [LINK_TYPE]: 1,
+  [SEARCH_TYPE]: 2,
 };
 
 function compareEdges(a: Edge, b: Edge): number {

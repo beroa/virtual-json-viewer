@@ -20,6 +20,8 @@ export type URLFragmentState = {
   searchStartingIndex?: number;
   jqFilter?: JQCommand["filter"];
   jqSlurp?: JQCommand["slurp"];
+  compareUrl?: string;
+  diffMode?: boolean;
 };
 
 export function useURLFragmentState(
@@ -105,6 +107,8 @@ const URL_KEYS: Record<keyof URLFragmentState, string> = {
   searchStartingIndex: "si",
   jqFilter: "jq",
   jqSlurp: "jqs",
+  compareUrl: "cu",
+  diffMode: "dm",
 };
 
 const STATE_KEYS: Record<string, keyof URLFragmentState> = Object.fromEntries(
@@ -138,4 +142,6 @@ const FIELD_SERIALIZERS: URLFragmentStateFieldsSerializer = {
   searchStartingIndex: NumberSerializer,
   jqFilter: StringSerializer,
   jqSlurp: new NullableSerializer(BooleanSerializer),
+  compareUrl: StringSerializer,
+  diffMode: BooleanSerializer,
 };

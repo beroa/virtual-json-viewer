@@ -19,6 +19,7 @@ import {
 } from "react";
 
 type SearchInputProps = Props<{
+  viewerId?: string;
   enableTreeEscape: boolean;
   isCommitted: boolean;
   isSearchCommitted: () => boolean;
@@ -30,6 +31,7 @@ type SearchInputProps = Props<{
 }>;
 
 export function SearchInput({
+  viewerId,
   enableTreeEscape,
   isCommitted,
   isSearchCommitted,
@@ -87,6 +89,7 @@ export function SearchInput({
           e.shiftKey
             ? ViewerEventType.SearchNavigatePrevious
             : ViewerEventType.SearchNavigateNext,
+          viewerId,
         );
       } else {
         commitSearch();
@@ -99,7 +102,7 @@ export function SearchInput({
       maybeClearTimeout();
 
       if (isSearchCommitted() && hasSelectedMatch) {
-        dispatch(ViewerEventType.SearchFocusCurrentMatch);
+        dispatch(ViewerEventType.SearchFocusCurrentMatch, viewerId);
       } else {
         if (current) current.value = "";
         clearPreview();

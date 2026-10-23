@@ -1,4 +1,5 @@
 import { JSX } from "react";
+import { DiffText, DIFF_TYPE, DiffMatch } from "./DiffText";
 import { LINK_TYPE, LinkifiedText, LinkMatch } from "./LinkifiedText";
 import { SearchMatchHandler } from "./Renderer";
 import {
@@ -8,22 +9,27 @@ import {
   SearchMatch,
 } from "./SearchedText";
 
-export type AnyMatch = SearchMatch | LinkMatch;
+export type AnyMatch = DiffMatch | SearchMatch | LinkMatch;
 
 export type RenderedNode = string | JSX.Element;
 
 export class NodeBuilder {
   private searchMatches: SearchMatchHandler[];
+  private buildDiffNode: DiffNodeBuilder;
   private buildSearchNode: SearchNodeBuilder;
   private buildLinkNode: LinkNodeBuilder;
 
   constructor() {
+    this.buildDiffNode = buildDiffNode;
     [this.searchMatches, this.buildSearchNode] = searchNodeBuilder();
     this.buildLinkNode = buildLinkNode;
   }
 
   public fromMatch(match: AnyMatch, children: RenderedNode[]): RenderedNode {
     switch (match.type) {
+      case DIFF_TYPE:
+        return this.buildDiffNode(match, children);
+
       case SEARCH_TYPE:
         return this.buildSearchNode(match, children);
 
@@ -35,6 +41,22 @@ export class NodeBuilder {
   public getSearchMatches(): SearchMatchHandler[] {
     return this.searchMatches;
   }
+}
+
+type DiffNodeBuilder = (
+  match: DiffMatch,
+  children: RenderedNode[],
+) => RenderedNode;
+
+function buildDiffNode(
+  match: DiffMatch,
+  children: RenderedNode[],
+): RenderedNode {
+  return (
+    <DiffText key={match.id} kind={match.metadata.kind}>
+      {children}
+    </DiffText>
+  );
 }
 
 type SearchNodeBuilder = (

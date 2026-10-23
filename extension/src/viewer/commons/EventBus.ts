@@ -13,6 +13,8 @@ export enum ViewerEventType {
 }
 
 export interface ViewerEvent extends Event {}
+export type ViewerEventScope = string;
+export type ScopedViewerEvent = CustomEvent<{ scope?: ViewerEventScope }>;
 
 export type NodePath = Json.Key[];
 
@@ -36,7 +38,7 @@ interface ViewerComplexEventMap {
 export type ViewerEventListener<K extends ViewerEventType> = (
   event: K extends ViewerComplexEventType
     ? ViewerComplexEventMap[K]
-    : undefined,
+    : ScopedViewerEvent,
 ) => void;
 
 export function subscribe<K extends ViewerEventType>(
@@ -53,9 +55,23 @@ export function unsubscribe<K extends ViewerEventType>(
   document.removeEventListener(type, listener as EventListener);
 }
 
-export function dispatch(event: ViewerSimpleEventType | ViewerEvent): void {
+export function dispatch(
+  event: ViewerSimpleEventType | ViewerEvent,
+  scope?: ViewerEventScope,
+): void {
   if (typeof event === "string") {
-    event = new Event(event);
+    event = new CustomEvent(event, { detail: { scope } });
   }
   document.dispatchEvent(event);
+}
+
+export function shouldHandleViewerEvent(
+  event: Nullable<Event>,
+  scope?: ViewerEventScope,
+): boolean {
+  if (!event || !(event instanceof CustomEvent)) {
+    return true;
+  }
+
+  return event.detail?.scope === undefined || event.detail.scope === scope;
 }
