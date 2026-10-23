@@ -1,3 +1,4 @@
+import { DIFF_TYPE } from "./DiffText";
 import { SYNTAX_TYPE } from "./JsonSyntax";
 import { LINK_TYPE } from "./LinkifiedText";
 import { MatchesResult } from "./Matcher";
@@ -20,6 +21,7 @@ export function renderMatches(
 ): RenderedMatchesResult {
   const allMatches = [
     ...(matches.syntaxMatches ?? []),
+    ...matches.diffMatches,
     ...matches.searchMatches,
     ...matches.linkMatches,
   ];
@@ -130,8 +132,9 @@ type Edge = {
 // e.g. links should wrap mark tags
 const TYPE_PRIORITY = {
   [SYNTAX_TYPE]: -1,
-  [LINK_TYPE]: 0,
-  [SEARCH_TYPE]: 1,
+  [DIFF_TYPE]: 0,
+  [LINK_TYPE]: 1,
+  [SEARCH_TYPE]: 2,
 };
 
 function compareEdges(a: Edge, b: Edge): number {

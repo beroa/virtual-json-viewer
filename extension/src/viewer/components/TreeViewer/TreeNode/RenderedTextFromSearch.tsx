@@ -28,6 +28,7 @@ export function RenderedTextFromSearch({
 
   const matches = useMemo(
     () => ({
+      diffMatches: [],
       searchMatches: searchMatches.map(searchMatchFromSearcher),
       linkMatches: linkifyUrls ? matchLinks(text) : [],
     }),

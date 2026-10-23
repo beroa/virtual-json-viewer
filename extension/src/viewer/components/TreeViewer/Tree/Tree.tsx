@@ -24,6 +24,7 @@ export type TreeProps<Context> = {
   children: TreeNodeComponent<Context>;
   restoreSnapshotRequest?: RestoreSnapshotRequest;
   onRestoreSnapshotApplied?: () => void;
+  onScrollElementChange?: (element: Nullable<HTMLElement>) => void;
   ref?: Ref<TreeHandler>;
 };
 
@@ -40,6 +41,7 @@ export function Tree<Context>({
   children: TreeNode,
   restoreSnapshotRequest,
   onRestoreSnapshotApplied,
+  onScrollElementChange,
   ref,
 }: TreeProps<Context>): JSX.Element {
   // TreeState is a reference to the mutable state of the tree.
@@ -69,6 +71,10 @@ export function Tree<Context>({
 
   // Reference to the list component
   const [list, listRef] = useListCallbackRef(null);
+  useEffect(() => {
+    onScrollElementChange?.(list?.element ?? null);
+    return () => onScrollElementChange?.(null);
+  }, [list, onScrollElementChange]);
 
   // Expose an handler to manipulate the tree from outside.
   // The handler reference is updated when the tree content is (re)loaded.
@@ -85,7 +91,9 @@ export function Tree<Context>({
     if (!restoreSnapshotRequest || !list) return;
 
     const timeoutId = setTimeout(() => {
-      list.element?.scrollTo({ top: restoreSnapshotRequest.snapshot.scrollTop });
+      list.element?.scrollTo({
+        top: restoreSnapshotRequest.snapshot.scrollTop,
+      });
     });
     return () => clearTimeout(timeoutId);
   }, [list, restoreSnapshotRequest]);

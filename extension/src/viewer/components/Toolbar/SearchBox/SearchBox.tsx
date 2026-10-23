@@ -20,6 +20,7 @@ export type SearchBoxProps = Props<{
   setSearch: Dispatch<SetStateAction<Search>>;
   navigation: SearchNavigation;
   enableVisibility: boolean;
+  viewerId?: string;
 }>;
 
 export function SearchBox({
@@ -28,6 +29,7 @@ export function SearchBox({
   setSearch,
   navigation,
   enableVisibility,
+  viewerId,
 }: SearchBoxProps): JSX.Element {
   const isCommittedRef = useRef(false);
   const [isCommitted, setIsCommitted] = useState(false);
@@ -88,6 +90,7 @@ export function SearchBox({
 
       <SearchInput
         className="flex-1 bg-inherit"
+        viewerId={viewerId}
         enableTreeEscape={enableVisibility}
         isCommitted={isCommitted}
         isSearchCommitted={() => isCommittedRef.current}
@@ -101,6 +104,7 @@ export function SearchBox({
       {search.text && (
         <SearchNavigationPanel
           className="mx-3 h-6"
+          viewerId={viewerId}
           currentIndex={navigation.currentIndex}
           isCommitted={isCommitted}
           commitSearch={commitSearch}

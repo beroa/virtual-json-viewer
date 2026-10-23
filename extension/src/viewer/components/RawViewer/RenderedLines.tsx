@@ -1,17 +1,21 @@
+import { DiffKind, InlineDiff, RawDiffLine } from "@/viewer/commons/Diff";
 import { Search } from "@/viewer/state";
 import { ReactNode, useEffect, useMemo } from "react";
 import { uid } from "uid";
 import {
+  DiffMatch,
   MatchesResult,
   matchLinks,
   matchSearch,
   RenderedText,
   SearchMatchHandler,
 } from "../RenderedText";
+import { DIFF_TYPE } from "../RenderedText/DiffText";
 import { matchJsonSyntax } from "../RenderedText/JsonSyntax";
 
 export type RenderedLinesProps = {
-  rawLines: string[];
+  rawLines?: string[];
+  lines?: RawDiffLine[];
   search: Nullable<Search>;
   linkifyUrls: boolean;
   onSearchMatchesUpdate: (searchMatches: SearchMatchHandler[]) => void;
@@ -19,18 +23,36 @@ export type RenderedLinesProps = {
 
 export function RenderedLines({
   rawLines,
+  lines,
   search,
   linkifyUrls,
   onSearchMatchesUpdate,
 }: RenderedLinesProps): ReactNode {
+  const displayLines = useMemo<RawDiffLine[]>(
+    () =>
+      lines ??
+      rawLines?.map((text) => ({
+        text,
+        kind: DiffKind.Same,
+        lineNumber: null,
+        placeholder: false,
+      })) ??
+      [],
+    [lines, rawLines],
+  );
+  const showLineNumbers = useMemo(
+    () => displayLines.some((line) => line.lineNumber !== null),
+    [displayLines],
+  );
+
   // Find all matches in each line
   const lineMatches = useMemo(() => {
     const lineMatches = new LineMatchesFlattener();
-    rawLines.forEach((text) => {
-      lineMatches.add(findMatches(text, search, linkifyUrls));
+    displayLines.forEach((line) => {
+      lineMatches.add(findMatches(line, search, linkifyUrls));
     });
     return lineMatches;
-  }, [rawLines, search, linkifyUrls]);
+  }, [displayLines, search, linkifyUrls]);
 
   // Register the search matches placeholders in the caller.
   // Handlers will (should?) be already resolved by the time this effect runs.
@@ -47,19 +69,44 @@ export function RenderedLines({
     lineMatches.resolveLineHandlers(lineIndex, handlers);
   }
 
-  return rawLines
-    .flatMap((text, lineIndex) => [
-      <br key={uid()} />,
+  return displayLines.map((line, lineIndex) => (
+    <div key={lineIndex} className={resolveRowClassName(line)}>
+      {showLineNumbers && (
+        <span className="text-viewer-foreground/45 w-10 shrink-0 pr-3 text-right select-none">
+          {line.lineNumber ?? ""}
+        </span>
+      )}
 
-      <RenderedText
-        key={lineIndex}
-        text={text}
-        matches={lineMatches.get(lineIndex)}
-        // Resolve the search matches handlers
-        ref={(ref) => resolveLineHandlers(lineIndex, ref?.searchMatches)}
-      />,
-    ])
-    .slice(1);
+      <span className="min-w-0 flex-1 overflow-hidden leading-6 break-all whitespace-pre-wrap">
+        <RenderedText
+          text={line.placeholder ? " " : line.text}
+          matches={lineMatches.get(lineIndex)}
+          ref={(ref) => resolveLineHandlers(lineIndex, ref?.searchMatches)}
+        />
+      </span>
+    </div>
+  ));
+}
+
+function resolveRowClassName(line: RawDiffLine): string {
+  if (line.placeholder) {
+    return "flex min-h-6 bg-white/[0.03] bg-[linear-gradient(135deg,transparent,transparent_6px,rgba(255,255,255,0.05)_6px,rgba(255,255,255,0.05)_12px)]";
+  }
+
+  const base = "flex min-h-6";
+
+  switch (line.kind) {
+    case DiffKind.Added:
+      return `${base} bg-emerald-500/10`;
+    case DiffKind.Removed:
+      return `${base} bg-red-500/10`;
+    case DiffKind.TypeChanged:
+      return `${base} bg-orange-500/10`;
+    case DiffKind.Changed:
+      return `${base} bg-amber-500/10`;
+    default:
+      return base;
+  }
 }
 
 type LineMatches = {
@@ -104,19 +151,32 @@ const SEARCH_MATCH_HANDLER_PLACEHOLDER: SearchMatchHandler = {
 };
 
 function findMatches(
-  text: string,
+  line: RawDiffLine,
   search: Nullable<Search>,
   linkifyUrls: boolean,
 ): MatchesResult {
+  const text = line.text;
   const searchMatches = search?.text
     ? matchSearch(text, search.text, search.caseSensitive)
     : [];
 
   const linkMatches = linkifyUrls ? matchLinks(text) : [];
+  const diffMatches = buildDiffMatches(line.inlineDiffs ?? []);
 
   return {
+    diffMatches,
     searchMatches,
     linkMatches,
     syntaxMatches: matchJsonSyntax(text),
   };
+}
+
+function buildDiffMatches(inlineDiffs: InlineDiff[]): DiffMatch[] {
+  return inlineDiffs.map((match) => ({
+    id: uid(),
+    start: match.start,
+    end: match.end,
+    type: DIFF_TYPE,
+    metadata: { kind: match.kind },
+  }));
 }

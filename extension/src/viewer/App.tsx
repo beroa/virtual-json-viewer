@@ -1,8 +1,11 @@
 import "@/global.css";
+import * as Diff from "@/viewer/commons/Diff";
 import * as Json from "@/viewer/commons/Json";
 import classNames from "classnames";
 import {
+  Dispatch,
   JSX,
+  SetStateAction,
   useCallback,
   useContext,
   useDeferredValue,
@@ -13,6 +16,7 @@ import {
 import { isActiveElementEditable } from "./commons/Dom";
 import {
   Alert,
+  DiffViewer,
   RawViewer,
   RawViewerProps,
   Toolbar,
@@ -25,6 +29,7 @@ import {
   CHORD_KEY,
   JQResult,
   KeydownEvent,
+  useEffectAsync,
   useGlobalKeydownEvent,
   useJQ,
 } from "./hooks";
@@ -35,6 +40,9 @@ import {
 } from "./localization";
 import {
   ApplicationState,
+  EmptyJQCommand,
+  EmptySearchNavigation,
+  SearchNavigation,
   Settings,
   SettingsContext,
   ViewerMode,
@@ -78,6 +86,12 @@ type LoadedAppProps = {
   translation: Translation;
 };
 
+type CompareLoadState = {
+  status: "idle" | "loading" | "loaded" | "error";
+  jsonText: string;
+  error: Nullable<string>;
+};
+
 function LoadedApp({
   jsonText,
   settings,
@@ -94,15 +108,134 @@ function LoadedApp({
   const state = useApplicationState(settings, isInputMultiline);
 
   // Apply jq filter
-  const [jqEnabled, jqResult] = useJQ(jsonText, state.jqCommand.value);
+  const jqCommand = state.diffMode.value
+    ? EmptyJQCommand
+    : state.jqCommand.value;
+  const [jqEnabled, jqResult] = useJQ(jsonText, jqCommand);
   const [jsonLines, error] = resolveJson(jsonResult, jqResult);
+
+  const [compareRequestId, setCompareRequestId] = useState(0);
+  const [compareLoadState, setCompareLoadState] = useState<CompareLoadState>({
+    status: "idle",
+    jsonText: "",
+    error: null,
+  });
+  const [compareControlsVisible, setCompareControlsVisible] = useState(() =>
+    Boolean(state.compareUrl.value || state.diffMode.value),
+  );
+  const [showParentKeys, setShowParentKeys] = useState(false);
+
+  useEffectAsync(
+    async (mutex) => {
+      if (!state.diffMode.value || !state.compareUrl.value) {
+        if (mutex.hasLock()) {
+          setCompareLoadState({ status: "idle", jsonText: "", error: null });
+        }
+        return;
+      }
+
+      setCompareLoadState((current) => ({
+        status: "loading",
+        jsonText: current.jsonText,
+        error: null,
+      }));
+
+      try {
+        const response = await fetch(state.compareUrl.value);
+        if (!response.ok) {
+          throw new Error(
+            `GET ${state.compareUrl.value} - ${response.status} ${response.statusText}`,
+          );
+        }
+
+        const compareJsonText = await response.text();
+        if (!mutex.hasLock()) return;
+
+        setCompareLoadState({
+          status: "loaded",
+          jsonText: compareJsonText,
+          error: null,
+        });
+      } catch (e) {
+        if (!mutex.hasLock()) return;
+        setCompareLoadState({
+          status: "error",
+          jsonText: "",
+          error: (e as Error).message,
+        });
+      }
+    },
+    [state.diffMode.value, state.compareUrl.value, compareRequestId],
+  );
+
+  const compareJsonResult = useMemo(() => {
+    if (compareLoadState.status !== "loaded") {
+      return null;
+    }
+
+    return Json.tryParseLines(compareLoadState.jsonText, {
+      sortKeys: settings.sortKeys,
+    });
+  }, [compareLoadState, settings.sortKeys]);
+
+  const compareJsonLines =
+    compareJsonResult instanceof Error || compareJsonResult === null
+      ? null
+      : compareJsonResult;
+
+  const compareError =
+    compareLoadState.error ??
+    (compareJsonResult instanceof Error ? compareJsonResult.message : null);
+
+  const diffResult = useMemo(() => {
+    if (
+      !state.diffMode.value ||
+      jsonLines === null ||
+      compareJsonLines === null
+    ) {
+      return null;
+    }
+    return Diff.compareJsonLines(jsonLines, compareJsonLines);
+  }, [state.diffMode.value, jsonLines, compareJsonLines]);
+
+  const [leftSearchNavigation, setLeftSearchNavigation] = useState(
+    EmptySearchNavigation,
+  );
+  const [rightSearchNavigation, setRightSearchNavigation] = useState(
+    EmptySearchNavigation,
+  );
+  const [activePane, setActivePane] = useState<"left" | "right">("left");
+
+  const diffReady =
+    state.diffMode.value &&
+    jsonLines !== null &&
+    compareJsonLines !== null &&
+    diffResult !== null &&
+    compareError === null;
+
+  useEffect(() => {
+    if (!diffReady) {
+      return;
+    }
+
+    state.searchNavigation.setValue(
+      activePane === "left" ? leftSearchNavigation : rightSearchNavigation,
+    );
+  }, [
+    activePane,
+    diffReady,
+    leftSearchNavigation,
+    rightSearchNavigation,
+    state.searchNavigation,
+  ]);
 
   // Build props for the viewer, with deferred transition for large JSON
   const viewerPropsParams = {
     state,
     jsonLines,
     isLargeJson: jsonText.length > LARGE_JSON_LENGTH,
-    enableEnterNode: jqEnabled && error === null,
+    enableEnterNode: !state.diffMode.value && jqEnabled && error === null,
+    showParentKeys,
   };
   const viewerProps = useTransitionViewerProps(viewerPropsParams);
 
@@ -131,8 +264,37 @@ function LoadedApp({
     jsonLines,
     viewerModeState: state.viewerMode,
     searchState: state.search,
-    searchNavigation: state.searchNavigation.value,
-    jqCommandState: jqEnabled ? state.jqCommand : undefined,
+    searchNavigation: diffReady
+      ? activePane === "left"
+        ? leftSearchNavigation
+        : rightSearchNavigation
+      : state.searchNavigation.value,
+    jqCommandState:
+      !state.diffMode.value && jqEnabled ? state.jqCommand : undefined,
+    compareState: {
+      url: state.compareUrl.value,
+      isDiffMode: state.diffMode.value,
+      isLoading: compareLoadState.status === "loading",
+      error: compareError,
+      activeViewerId: diffReady ? activePane : "main",
+    },
+    compareControlsVisible,
+    setCompareControlsVisible,
+    showParentKeys,
+    setShowParentKeys,
+    setCompareUrl: (url: string) => state.compareUrl.setValue(url),
+    onCompare: () => {
+      if (!state.compareUrl.value) return;
+      setCompareControlsVisible(true);
+      state.diffMode.setValue(true);
+      state.viewerMode.setValue(ViewerMode.Raw);
+      setCompareRequestId((id) => id + 1);
+    },
+    onClearCompare: () => {
+      state.diffMode.setValue(false);
+      state.compareUrl.setValue("");
+      setCompareLoadState({ status: "idle", jsonText: "", error: null });
+    },
   };
 
   const Viewer =
@@ -157,6 +319,20 @@ function LoadedApp({
 
         {viewerProps === null ? (
           <ViewerPlaceholder className="flex-auto" />
+        ) : diffReady ? (
+          <DiffModeView
+            state={state}
+            jsonText={jsonText}
+            jsonLines={jsonLines}
+            compareUrl={state.compareUrl.value}
+            compareJsonText={compareLoadState.jsonText}
+            compareJsonLines={compareJsonLines}
+            diffResult={diffResult}
+            leftSearchNavigation={setLeftSearchNavigation}
+            rightSearchNavigation={setRightSearchNavigation}
+            activePane={activePane}
+            setActivePane={setActivePane}
+          />
         ) : (
           <Viewer
             {...viewerProps}
@@ -172,11 +348,84 @@ function LoadedApp({
   );
 }
 
+type DiffModeViewProps = {
+  state: ApplicationState;
+  jsonText: string;
+  jsonLines: Json.Lines;
+  compareUrl: string;
+  compareJsonText: string;
+  compareJsonLines: Json.Lines;
+  diffResult: Diff.DiffResult;
+  leftSearchNavigation: Dispatch<SetStateAction<SearchNavigation>>;
+  rightSearchNavigation: Dispatch<SetStateAction<SearchNavigation>>;
+  activePane: "left" | "right";
+  setActivePane: (pane: "left" | "right") => void;
+};
+
+function DiffModeView({
+  state,
+  jsonText,
+  jsonLines,
+  compareUrl,
+  compareJsonText,
+  compareJsonLines,
+  diffResult,
+  leftSearchNavigation,
+  rightSearchNavigation,
+  activePane,
+  setActivePane,
+}: DiffModeViewProps): JSX.Element {
+  const { indentation, sortKeys, textSize } = useContext(SettingsContext);
+
+  const leftRawLines = useMemo(
+    () =>
+      jsonLines.flatMap((line) =>
+        Json.toString(line, { sortKeys, space: indentation }).split("\n"),
+      ),
+    [jsonLines, sortKeys, indentation],
+  );
+  const rightRawLines = useMemo(
+    () =>
+      compareJsonLines.flatMap((line) =>
+        Json.toString(line, { sortKeys, space: indentation }).split("\n"),
+      ),
+    [compareJsonLines, sortKeys, indentation],
+  );
+  const rawDiff = useMemo(
+    () => Diff.compareRawLines(leftRawLines, rightRawLines),
+    [leftRawLines, rightRawLines],
+  );
+
+  return (
+    <DiffViewer
+      className={resolveTextSizeClass(textSize)}
+      viewerMode={state.viewerMode.value}
+      search={state.search.value}
+      searchStartingIndex={state.searchStartingIndex}
+      isLargeJsonLeft={jsonText.length > LARGE_JSON_LENGTH}
+      isLargeJsonRight={compareJsonText.length > LARGE_JSON_LENGTH}
+      leftLabel={window.location.href}
+      rightLabel={compareUrl}
+      leftJsonLines={jsonLines}
+      rightJsonLines={compareJsonLines}
+      leftDiffByPath={diffResult.left}
+      rightDiffByPath={diffResult.right}
+      leftRawLines={rawDiff.left}
+      rightRawLines={rawDiff.right}
+      setLeftSearchNavigation={leftSearchNavigation}
+      setRightSearchNavigation={rightSearchNavigation}
+      activePane={activePane}
+      setActivePane={setActivePane}
+    />
+  );
+}
+
 type ViewerPropsParams = {
   state: ApplicationState;
   jsonLines: Nullable<Json.Lines>;
   isLargeJson: boolean;
   enableEnterNode: boolean;
+  showParentKeys: boolean;
 };
 
 // Defer state transition in case of large JSON in order to show loading placeholder
@@ -185,6 +434,7 @@ function useTransitionViewerProps({
   jsonLines,
   isLargeJson,
   enableEnterNode,
+  showParentKeys,
 }: ViewerPropsParams): Nullable<ViewerProps> {
   const [nextProps, setNextProps] = useState<Nullable<ViewerProps>>(null);
   const deferredProps = useDeferredValue<Nullable<ViewerProps>>(nextProps);
@@ -198,6 +448,7 @@ function useTransitionViewerProps({
     state.search.value,
     isLargeJson,
     enableEnterNode,
+    showParentKeys,
     // searchStartingIndex MUST not trigger re-render: changes are meaningful only if search-related props change
   ];
 
@@ -215,6 +466,7 @@ function useTransitionViewerProps({
       searchStartingIndex: state.searchStartingIndex,
       isLargeJson,
       enableEnterNode,
+      showParentKeys,
     };
   }, transitionDeps);
 

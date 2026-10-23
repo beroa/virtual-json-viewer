@@ -23,6 +23,8 @@ export type ApplicationState = {
   searchNavigation: StateObject<SearchNavigation>;
   searchStartingIndex: number;
   jqCommand: StateObject<JQCommand>;
+  compareUrl: StateObject<string>;
+  diffMode: StateObject<boolean>;
 };
 
 // Application state is stored in session and optionally in URL to be kept on page reload.
@@ -60,6 +62,18 @@ export function useApplicationState(
     caseSensitive: urlState.searchCaseSensitive ?? EmptySearch.caseSensitive,
   };
   const [search, setSearch] = useSessionStorage("search", startingSearch);
+
+  const startingCompareUrl = urlState.compareUrl ?? "";
+  const [compareUrl, setCompareUrl] = useSessionStorage(
+    "compare-url",
+    startingCompareUrl,
+  );
+
+  const startingDiffMode = urlState.diffMode ?? false;
+  const [diffMode, setDiffMode] = useSessionStorage(
+    "diff-mode",
+    startingDiffMode,
+  );
 
   // Search navigation
   const [searchNavigation, setSearchNavigation] = useState(
@@ -100,12 +114,14 @@ export function useApplicationState(
     ]),
     searchStartingIndex: syncSearchStartingIndex,
     jqCommand: useStateObjectAdapter([jq, setJQ]),
+    compareUrl: useStateObjectAdapter([compareUrl, setCompareUrl]),
+    diffMode: useStateObjectAdapter([diffMode, setDiffMode]),
   };
 
   // Sync to URL fragment avoiding infinite loops by checking dependencies individually
   useEffect(
     () => setURLState(urlFragmentFromState(state)),
-    [viewer, search, searchStartingIndex, jq],
+    [viewer, search, searchStartingIndex, jq, compareUrl, diffMode],
   );
 
   return state;
@@ -134,6 +150,11 @@ function urlFragmentFromState(state: ApplicationState): URLFragmentState {
   if (state.jqCommand.value.filter) {
     urlFragmentState.jqFilter = state.jqCommand.value.filter;
     urlFragmentState.jqSlurp = state.jqCommand.value.slurp;
+  }
+
+  if (state.diffMode.value && state.compareUrl.value) {
+    urlFragmentState.compareUrl = state.compareUrl.value;
+    urlFragmentState.diffMode = true;
   }
 
   return urlFragmentState;

@@ -1,5 +1,5 @@
-import { SearchMatchHandler } from "@/viewer/components/RenderedText";
 import * as Json from "@/viewer/commons/Json";
+import { SearchMatchHandler } from "@/viewer/components/RenderedText";
 import { RefCurrent } from "@/viewer/hooks";
 import { SearchNavigation } from "@/viewer/state";
 import { NodeId, TreeHandler, TreeSnapshot } from "./Tree";
@@ -35,6 +35,7 @@ export class TreeNavigator {
   // Nodes navigation
   private handlerById: Map<NodeId, TreeNavigatorNodeHandler> = new Map();
   private lastFocused?: NodeId;
+  private onCurrentNodeChange?: (id: NodeId) => void;
   private repeatedRowNavigation: RepeatedRowNavigation = {
     direction: null,
     extraStep: false,
@@ -49,9 +50,11 @@ export class TreeNavigator {
   constructor(
     tree: RefCurrent<TreeHandler>,
     treeElem: RefCurrent<HTMLElement>,
+    onCurrentNodeChange?: (id: NodeId) => void,
   ) {
     this.tree = tree;
     this.treeElem = treeElem;
+    this.onCurrentNodeChange = onCurrentNodeChange;
   }
 
   // Nodes lifecycle
@@ -220,6 +223,7 @@ export class TreeNavigator {
     this.handlerById.get(this.lastFocused ?? -1)?.setAnchored(false);
     this.lastFocused = id;
     this.trySetAnchorCurrent(true);
+    this.onCurrentNodeChange?.(id);
   }
 
   private trySetAnchorCurrent(anchored: boolean) {

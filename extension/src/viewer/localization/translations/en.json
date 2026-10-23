@@ -121,6 +121,10 @@
     },
     "expand": "Expand",
     "collapse": "Collapse",
+    "parents": {
+      "show": "Show parent keys",
+      "hide": "Hide parent keys"
+    },
     "save": "Download",
     "search": {
       "clear": "Clear",
@@ -148,6 +152,14 @@
       },
       "run": "Run command",
       "genericError": "JQ command failed"
+    },
+    "compare": {
+      "placeholder": "Compare against URL",
+      "run": "Compare",
+      "loading": "Loading...",
+      "clear": "Clear diff",
+      "show": "Show compare",
+      "hide": "Hide compare"
     }
   }
 }
