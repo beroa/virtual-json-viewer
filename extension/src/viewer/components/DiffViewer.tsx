@@ -5,7 +5,6 @@ import {
   RawDiffLine,
 } from "@/viewer/commons/Diff";
 import * as Json from "@/viewer/commons/Json";
-import { TranslationContext } from "@/viewer/localization";
 import { Search, SearchNavigation, ViewerMode } from "@/viewer/state";
 import classNames from "classnames";
 import {
@@ -14,7 +13,7 @@ import {
   ReactNode,
   SetStateAction,
   useCallback,
-  useContext,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -39,6 +38,7 @@ export type DiffViewerProps = Props<{
   rightDiffByPath: DiffByPath;
   leftRawLines: RawDiffLine[];
   rightRawLines: RawDiffLine[];
+  ignorePatternText: string;
   setLeftSearchNavigation: PaneNavigationSetter;
   setRightSearchNavigation: PaneNavigationSetter;
   activePane: "left" | "right";
@@ -59,40 +59,50 @@ export function DiffViewer({
   rightDiffByPath,
   leftRawLines,
   rightRawLines,
+  ignorePatternText,
   setLeftSearchNavigation,
   setRightSearchNavigation,
   activePane,
   setActivePane,
   className,
 }: DiffViewerProps): JSX.Element {
-  const t = useContext(TranslationContext).diffIgnore;
-  const [controlsVisible, setControlsVisible] = useState(false);
-  const [patternText, setPatternText] = useState("");
-  const pattern = useMemo(() => {
-    if (!patternText) return null;
-    try {
-      return new RegExp(patternText);
-    } catch {
-      return null;
+  const deferredPatternText = useDeferredValue(ignorePatternText);
+  const patterns = useMemo(() => {
+    const parsed: RegExp[] = [];
+    for (const line of deferredPatternText.split("\n")) {
+      const source = line.trim();
+      if (!source) continue;
+      try {
+        parsed.push(new RegExp(source));
+      } catch {
+        return null;
+      }
     }
-  }, [patternText]);
-  const invalid = !!patternText && !pattern;
+    return parsed;
+  }, [deferredPatternText]);
   const filteredRaw = useMemo(
     () =>
-      pattern
+      viewerMode === ViewerMode.Raw && patterns?.length
         ? ignoreRawDiffLines(
             { left: leftRawLines, right: rightRawLines },
-            pattern,
+            patterns,
           )
         : { left: leftRawLines, right: rightRawLines },
-    [leftRawLines, rightRawLines, pattern],
+    [viewerMode, leftRawLines, rightRawLines, patterns],
   );
   const filteredTree = useMemo(
     () =>
-      pattern
-        ? compareJsonLines(leftJsonLines, rightJsonLines, pattern)
+      viewerMode === ViewerMode.Tree && patterns?.length
+        ? compareJsonLines(leftJsonLines, rightJsonLines, patterns)
         : { left: leftDiffByPath, right: rightDiffByPath },
-    [leftJsonLines, rightJsonLines, leftDiffByPath, rightDiffByPath, pattern],
+    [
+      viewerMode,
+      leftJsonLines,
+      rightJsonLines,
+      leftDiffByPath,
+      rightDiffByPath,
+      patterns,
+    ],
   );
   const [leftScrollElement, setLeftScrollElement] =
     useState<Nullable<HTMLElement>>(null);
@@ -172,45 +182,7 @@ export function DiffViewer({
         </DiffPane>
       </div>
     );
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="bg-toolbar-background text-toolbar-foreground flex flex-wrap items-center gap-2 px-2 py-1">
-        <button
-          type="button"
-          className="bg-toolbar-focus rounded-sm px-2 py-1"
-          aria-expanded={controlsVisible}
-          onClick={() => setControlsVisible(!controlsVisible)}
-        >
-          {pattern ? t.active : t.button}
-        </button>
-        {controlsVisible && (
-          <>
-            <input
-              autoFocus
-              aria-label={t.button}
-              aria-invalid={invalid}
-              aria-describedby="diff-ignore-help"
-              className="bg-input-background text-input-foreground min-w-48 flex-1 rounded-sm px-2 py-1"
-              placeholder={t.placeholder}
-              value={patternText}
-              onChange={(event) => setPatternText(event.target.value)}
-            />
-            <button type="button" onClick={() => setPatternText("")}>
-              {t.clear}
-            </button>
-            <span
-              id="diff-ignore-help"
-              className="w-full text-sm"
-              role={invalid ? "alert" : undefined}
-            >
-              {invalid ? t.invalid : t.help}
-            </span>
-          </>
-        )}
-      </div>
-      {viewer}
-    </div>
-  );
+  return <div className="flex min-h-0 flex-1">{viewer}</div>;
 }
 
 function useSynchronizedScroll(

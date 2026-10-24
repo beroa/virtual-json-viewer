@@ -163,11 +163,14 @@
     }
   },
   "diffIgnore": {
-    "button": "Ignore lines by regex",
-    "active": "Ignore lines by regex (active)",
-    "placeholder": "e.g. \"updated_at\"\\s*:",
+    "button": "Ignore Lines?",
+    "active": "Ignoring Lines!",
+    "title": "Ignore lines by regex",
+    "placeholder": "One regex per row, e.g. \\\"updated_at\\\"\\\\s*:",
     "clear": "Clear",
-    "invalid": "Invalid regular expression. No lines are ignored.",
-    "help": "Enter a JavaScript regex without / delimiters. A match on either side ignores the entire row."
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "invalid": "Invalid regular expression.",
+    "help": "Enter one JavaScript regex per row, without / delimiters. A match on either side ignores the entire row."
   }
 }

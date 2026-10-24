@@ -115,7 +115,9 @@ export function Tree<Context>({
       rowCount={rowProps.treeState.length()}
       rowHeight={rowHeight}
       rowProps={rowProps}
-      overscanCount={50} // ~page size with default settings
+      // Diff mode mounts two trees at once, so keeping a full page of extra
+      // rows rendered in each pane multiplies the work without helping scroll.
+      overscanCount={10}
     />
   );
 }

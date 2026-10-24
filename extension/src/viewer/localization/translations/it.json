@@ -163,11 +163,14 @@
     }
   },
   "diffIgnore": {
-    "button": "Ignora righe con regex",
-    "active": "Ignora righe con regex (attivo)",
-    "placeholder": "es. \"updated_at\"\\s*:",
+    "button": "Ignora righe?",
+    "active": "Righe ignorate!",
+    "title": "Ignora righe con regex",
+    "placeholder": "Una regex per riga, es. \\\"updated_at\\\"\\\\s*:",
     "clear": "Cancella",
-    "invalid": "Espressione regolare non valida. Nessuna riga ignorata.",
-    "help": "Inserisci una regex JavaScript senza delimitatori /. Una corrispondenza su un lato ignora tutta la riga."
+    "cancel": "Annulla",
+    "apply": "Applica",
+    "invalid": "Espressione regolare non valida.",
+    "help": "Inserisci una regex JavaScript per riga, senza delimitatori /. Una corrispondenza su un lato ignora tutta la riga."
   }
 }

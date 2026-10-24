@@ -51,7 +51,7 @@ const LCS_MATRIX_LIMIT = 120_000;
 export function compareJsonLines(
   leftLines: Json.Lines,
   rightLines: Json.Lines,
-  ignorePattern?: RegExp,
+  ignorePatterns?: RegExp | RegExp[],
 ): DiffResult {
   const result: DiffResult = {
     left: {},
@@ -65,7 +65,7 @@ export function compareJsonLines(
     ".",
     ".",
     result,
-    ignorePattern,
+    ignorePatterns,
   );
 
   result.hasDiff =
@@ -95,19 +95,19 @@ function compareAtPaths(
   leftPath: string,
   rightPath: string,
   result: DiffResult,
-  ignorePattern?: RegExp,
+  ignorePatterns?: RegExp | RegExp[],
   nodeKey?: string,
 ): boolean {
   const ignored =
-    matchesNodeLine(left, nodeKey, ignorePattern) ||
-    matchesNodeLine(right, nodeKey, ignorePattern);
+    matchesNodeLine(left, nodeKey, ignorePatterns) ||
+    matchesNodeLine(right, nodeKey, ignorePatterns);
   if (left === undefined) {
     markSubtree(
       right!,
       rightPath,
       result.right,
       DiffKind.Added,
-      ignorePattern,
+      ignorePatterns,
       nodeKey,
     );
     return true;
@@ -119,7 +119,7 @@ function compareAtPaths(
       leftPath,
       result.left,
       DiffKind.Removed,
-      ignorePattern,
+      ignorePatterns,
       nodeKey,
     );
     return true;
@@ -157,7 +157,7 @@ function compareAtPaths(
             ? rightPath
             : childPath(rightPath, pair.rightIndex),
           result,
-          ignorePattern,
+          ignorePatterns,
         ) || hasDiff;
     }
 
@@ -174,7 +174,7 @@ function compareAtPaths(
           childPath(leftPath, key),
           childPath(rightPath, key),
           result,
-          ignorePattern,
+          ignorePatterns,
           key,
         ) || hasDiff;
     }
@@ -487,15 +487,15 @@ function markSubtree(
   path: string,
   target: DiffByPath,
   kind: DiffKind.Added | DiffKind.Removed,
-  ignorePattern?: RegExp,
+  ignorePatterns?: RegExp | RegExp[],
   nodeKey?: string,
 ) {
-  if (!matchesNodeLine(root, nodeKey, ignorePattern))
+  if (!matchesNodeLine(root, nodeKey, ignorePatterns))
     markPath(target, path, kind);
 
   if (Json.isArray(root)) {
     root.forEach((value, index) =>
-      markSubtree(value, childPath(path, index), target, kind, ignorePattern),
+      markSubtree(value, childPath(path, index), target, kind, ignorePatterns),
     );
     return;
   }
@@ -507,7 +507,7 @@ function markSubtree(
         childPath(path, key),
         target,
         kind,
-        ignorePattern,
+        ignorePatterns,
         key,
       ),
     );
@@ -559,34 +559,38 @@ function sameNodeType(left: Json.Root, right: Json.Root): boolean {
 function matchesNodeLine(
   root: MaybeRoot,
   nodeKey: string | undefined,
-  pattern?: RegExp,
+  patterns?: RegExp | RegExp[],
 ): boolean {
-  if (root === undefined || !pattern) return false;
+  if (root === undefined || !patterns) return false;
   const key = nodeKey === undefined ? "" : `${JSON.stringify(nodeKey)}: `;
   const value = Json.isLeaf(root)
     ? Json.toString(root)
     : Json.isArray(root)
       ? "["
       : "{";
-  pattern.lastIndex = 0;
-  return pattern.test(key + value);
+  return matchesAnyPattern(key + value, patterns);
 }
 
 export function ignoreRawDiffLines(
   result: RawDiffResult,
-  pattern: RegExp,
+  patterns: RegExp | RegExp[],
 ): RawDiffResult {
   const left = [...result.left];
   const right = [...result.right];
   left.forEach((line, index) => {
-    const matches = (candidate: RawDiffLine) => {
-      pattern.lastIndex = 0;
-      return !candidate.placeholder && pattern.test(candidate.text);
-    };
+    const matches = (candidate: RawDiffLine) =>
+      !candidate.placeholder && matchesAnyPattern(candidate.text, patterns);
     if (matches(line) || matches(right[index])) {
       left[index] = { ...line, kind: DiffKind.Same, inlineDiffs: [] };
       right[index] = { ...right[index], kind: DiffKind.Same, inlineDiffs: [] };
     }
   });
   return { left, right };
+}
+
+function matchesAnyPattern(text: string, patterns: RegExp | RegExp[]): boolean {
+  return (Array.isArray(patterns) ? patterns : [patterns]).some((pattern) => {
+    pattern.lastIndex = 0;
+    return pattern.test(text);
+  });
 }

@@ -205,6 +205,7 @@ function LoadedApp({
     EmptySearchNavigation,
   );
   const [activePane, setActivePane] = useState<"left" | "right">("left");
+  const [ignorePatternText, setIgnorePatternText] = useState("");
 
   const diffReady =
     state.diffMode.value &&
@@ -280,6 +281,8 @@ function LoadedApp({
     },
     compareControlsVisible,
     setCompareControlsVisible,
+    ignorePatternText,
+    setIgnorePatternText,
     showParentKeys,
     setShowParentKeys,
     setCompareUrl: (url: string) => state.compareUrl.setValue(url),
@@ -332,6 +335,7 @@ function LoadedApp({
             rightSearchNavigation={setRightSearchNavigation}
             activePane={activePane}
             setActivePane={setActivePane}
+            ignorePatternText={ignorePatternText}
           />
         ) : (
           <Viewer
@@ -360,6 +364,7 @@ type DiffModeViewProps = {
   rightSearchNavigation: Dispatch<SetStateAction<SearchNavigation>>;
   activePane: "left" | "right";
   setActivePane: (pane: "left" | "right") => void;
+  ignorePatternText: string;
 };
 
 function DiffModeView({
@@ -374,6 +379,7 @@ function DiffModeView({
   rightSearchNavigation,
   activePane,
   setActivePane,
+  ignorePatternText,
 }: DiffModeViewProps): JSX.Element {
   const { indentation, sortKeys, textSize } = useContext(SettingsContext);
 
@@ -412,6 +418,7 @@ function DiffModeView({
       rightDiffByPath={diffResult.right}
       leftRawLines={rawDiff.left}
       rightRawLines={rawDiff.right}
+      ignorePatternText={ignorePatternText}
       setLeftSearchNavigation={leftSearchNavigation}
       setRightSearchNavigation={rightSearchNavigation}
       activePane={activePane}
