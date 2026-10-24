@@ -49,6 +49,7 @@ export type TreeViewerProps = Props<{
 type ParentKey = {
   key: Json.Key;
   nesting: number;
+  nodeId: NodeId;
 };
 
 export function TreeViewer({
@@ -57,7 +58,7 @@ export function TreeViewer({
   search,
   setSearchNavigation,
   searchStartingIndex,
-  showParentKeys = false,
+  showParentKeys = true,
   viewerId = "main",
   diffByPath,
   onScrollElementChange,
@@ -85,7 +86,8 @@ export function TreeViewer({
 
   // Track tree element size
   const [parent, parentRef] = useReactiveRef<HTMLDivElement>();
-  const { height, width } = useElementSize(parent);
+  const [treeContainer, treeContainerRef] = useReactiveRef<HTMLDivElement>();
+  const { height, width } = useElementSize(treeContainer);
 
   // Global events
   const expand = useCallback(() => tree?.openAll(), [tree]);
@@ -107,20 +109,46 @@ export function TreeViewer({
   useGlobalKeydownEvent(handleShortcut);
 
   // Tree Navigator
-  const treeNavigator = useMemo(
-    () =>
-      new TreeNavigator(tree, parent, (id) => {
-        const node = tree?.get(id);
-        const keys: ParentKey[] = [];
-        let ancestor = node?.parent;
-        while (ancestor) {
-          if (ancestor.key !== null) {
-            keys.unshift({ key: ancestor.key, nesting: ancestor.nesting });
-          }
-          ancestor = ancestor.parent;
+  const updateParentKeys = useCallback(
+    (id: NodeId) => {
+      const node = tree?.get(id);
+      const keys: ParentKey[] = [];
+      let ancestor = node?.parent;
+      while (ancestor) {
+        if (ancestor.key !== null) {
+          keys.unshift({
+            key: ancestor.key,
+            nesting: ancestor.nesting,
+            nodeId: ancestor.id,
+          });
         }
-        setParentKeys(keys);
-      }),
+        ancestor = ancestor.parent;
+      }
+      setParentKeys((current) =>
+        current.length === keys.length &&
+        current.every(
+          (key, index) =>
+            key.key === keys[index].key &&
+            key.nesting === keys[index].nesting &&
+            key.nodeId === keys[index].nodeId,
+        )
+          ? current
+          : keys,
+      );
+    },
+    [tree],
+  );
+
+  const updateParentKeysForVisibleRow = useCallback(
+    (index: number) => {
+      const node = tree?.getByIndex(index);
+      if (node) updateParentKeys(node.id);
+    },
+    [tree, updateParentKeys],
+  );
+
+  const treeNavigator = useMemo(
+    () => new TreeNavigator(tree, parent),
     [tree, parent],
   );
 
@@ -258,36 +286,41 @@ export function TreeViewer({
       ref={parentRef}
       className={classNames(
         className,
-        "focus:outline-viewer-foreground relative h-full overflow-hidden focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
+        "focus:outline-viewer-foreground relative flex h-full flex-col overflow-hidden focus:outline-1 focus:-outline-offset-1 focus:outline-solid",
       )}
       tabIndex={0}
       onKeyDown={onKeydown}
     >
-      <Tree
-        height={height}
-        width={width}
-        treeWalker={walker}
-        ref={treeRef}
-        context={context}
-        restoreSnapshotRequest={restoreSnapshotRequest}
-        onRestoreSnapshotApplied={clearRestoreSnapshotRequest}
-        onScrollElementChange={onScrollElementChange}
-      >
-        {TreeNode}
-      </Tree>
       {showParentKeys && parentKeys.length > 0 && (
-        <div className="bg-viewer-background text-json-key border-toolbar-foreground/20 pointer-events-none absolute top-0 right-0 left-0 z-10 border-b py-1 shadow-sm">
-          {parentKeys.map(({ key, nesting }, index) => (
-            <div
+        <div className="bg-viewer-background text-json-key border-toolbar-foreground/20 z-10 shrink-0 border-b py-1 shadow-sm">
+          {parentKeys.map(({ key, nesting, nodeId }, index) => (
+            <button
               key={index}
-              className="whitespace-pre-wrap"
+              type="button"
+              className="block w-full text-left whitespace-pre-wrap hover:underline"
               style={{ paddingLeft: `calc(${nesting}em + 1.375rem)` }}
+              onClick={() => tree?.scrollTo(nodeId, "start")}
             >
               {key}:
-            </div>
+            </button>
           ))}
         </div>
       )}
+      <div ref={treeContainerRef} className="min-h-0 flex-1">
+        <Tree
+          height={height}
+          width={width}
+          treeWalker={walker}
+          ref={treeRef}
+          context={context}
+          restoreSnapshotRequest={restoreSnapshotRequest}
+          onRestoreSnapshotApplied={clearRestoreSnapshotRequest}
+          onScrollElementChange={onScrollElementChange}
+          onVisibleRowChange={updateParentKeysForVisibleRow}
+        >
+          {TreeNode}
+        </Tree>
+      </div>
     </div>
   );
 }

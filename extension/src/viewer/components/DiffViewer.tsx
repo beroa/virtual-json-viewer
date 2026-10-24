@@ -39,6 +39,7 @@ export type DiffViewerProps = Props<{
   leftRawLines: RawDiffLine[];
   rightRawLines: RawDiffLine[];
   ignorePatternText: string;
+  showParentKeys: boolean;
   setLeftSearchNavigation: PaneNavigationSetter;
   setRightSearchNavigation: PaneNavigationSetter;
   activePane: "left" | "right";
@@ -60,6 +61,7 @@ export function DiffViewer({
   leftRawLines,
   rightRawLines,
   ignorePatternText,
+  showParentKeys,
   setLeftSearchNavigation,
   setRightSearchNavigation,
   activePane,
@@ -158,6 +160,7 @@ export function DiffViewer({
             searchStartingIndex={searchStartingIndex}
             viewerId="left"
             diffByPath={filteredTree.left}
+            showParentKeys={showParentKeys}
             onScrollElementChange={setLeftScrollElementStable}
           />
         </DiffPane>
@@ -177,6 +180,7 @@ export function DiffViewer({
             searchStartingIndex={searchStartingIndex}
             viewerId="right"
             diffByPath={filteredTree.right}
+            showParentKeys={showParentKeys}
             onScrollElementChange={setRightScrollElementStable}
           />
         </DiffPane>

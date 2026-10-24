@@ -99,9 +99,7 @@ export function Toolbar({
             "hover:bg-toolbar-focus": isTreeView && !showParentKeys,
             "bg-toolbar-focus": isTreeView && showParentKeys,
           })}
-          title={
-            showParentKeys ? t.toolbar.parents.hide : t.toolbar.parents.show
-          }
+          title={t.toolbar.parents.show}
           icon={Icon.ListTree}
           onClick={() => setShowParentKeys((show) => !show)}
           disabled={!isTreeView}

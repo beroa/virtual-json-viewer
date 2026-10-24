@@ -2,6 +2,7 @@ import { SettingsContext, TextSize } from "@/viewer/state";
 import {
   JSX,
   Ref,
+  useCallback,
   useContext,
   useEffect,
   useImperativeHandle,
@@ -25,6 +26,7 @@ export type TreeProps<Context> = {
   restoreSnapshotRequest?: RestoreSnapshotRequest;
   onRestoreSnapshotApplied?: () => void;
   onScrollElementChange?: (element: Nullable<HTMLElement>) => void;
+  onVisibleRowChange?: (index: number) => void;
   ref?: Ref<TreeHandler>;
 };
 
@@ -42,6 +44,7 @@ export function Tree<Context>({
   restoreSnapshotRequest,
   onRestoreSnapshotApplied,
   onScrollElementChange,
+  onVisibleRowChange,
   ref,
 }: TreeProps<Context>): JSX.Element {
   // TreeState is a reference to the mutable state of the tree.
@@ -102,6 +105,11 @@ export function Tree<Context>({
     () => ({ treeState, context, TreeNode }),
     [treeState, context, TreeNode],
   );
+  const handleRowsRendered = useCallback(
+    ({ startIndex }: { startIndex: number }) =>
+      onVisibleRowChange?.(startIndex),
+    [onVisibleRowChange],
+  );
 
   const defaultRowHeight = useDefaultRowHeight();
   const rowHeight = useDynamicRowHeight({ defaultRowHeight });
@@ -118,6 +126,7 @@ export function Tree<Context>({
       // Diff mode mounts two trees at once, so keeping a full page of extra
       // rows rendered in each pane multiplies the work without helping scroll.
       overscanCount={10}
+      onRowsRendered={handleRowsRendered}
     />
   );
 }

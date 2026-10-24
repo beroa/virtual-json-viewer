@@ -123,7 +123,7 @@ function LoadedApp({
   const [compareControlsVisible, setCompareControlsVisible] = useState(() =>
     Boolean(state.compareUrl.value || state.diffMode.value),
   );
-  const [showParentKeys, setShowParentKeys] = useState(false);
+  const [showParentKeys, setShowParentKeys] = useState(true);
 
   useEffectAsync(
     async (mutex) => {
@@ -336,6 +336,7 @@ function LoadedApp({
             activePane={activePane}
             setActivePane={setActivePane}
             ignorePatternText={ignorePatternText}
+            showParentKeys={showParentKeys}
           />
         ) : (
           <Viewer
@@ -365,6 +366,7 @@ type DiffModeViewProps = {
   activePane: "left" | "right";
   setActivePane: (pane: "left" | "right") => void;
   ignorePatternText: string;
+  showParentKeys: boolean;
 };
 
 function DiffModeView({
@@ -380,6 +382,7 @@ function DiffModeView({
   activePane,
   setActivePane,
   ignorePatternText,
+  showParentKeys,
 }: DiffModeViewProps): JSX.Element {
   const { indentation, sortKeys, textSize } = useContext(SettingsContext);
 
@@ -419,6 +422,7 @@ function DiffModeView({
       leftRawLines={rawDiff.left}
       rightRawLines={rawDiff.right}
       ignorePatternText={ignorePatternText}
+      showParentKeys={showParentKeys}
       setLeftSearchNavigation={leftSearchNavigation}
       setRightSearchNavigation={rightSearchNavigation}
       activePane={activePane}
