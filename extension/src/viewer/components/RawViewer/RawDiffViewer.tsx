@@ -12,8 +12,10 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { uid } from "uid";
 import {
@@ -59,6 +61,34 @@ export function RawDiffViewer({
   className,
 }: RawDiffViewerProps): JSX.Element {
   const linkifyUrls = useLinkifyUrls(isLargeJsonLeft || isLargeJsonRight);
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  const [scrollElement, setScrollElementState] =
+    useState<Nullable<HTMLDivElement>>(null);
+  const contentElement = useRef<Nullable<HTMLDivElement>>(null);
+  const [measuredRanges, setMeasuredRanges] = useState<MeasuredDiffRanges>({
+    left: [],
+    right: [],
+    contentHeight: 1,
+    headerHeight: 0,
+  });
+  const scrollbarObserver = useRef<Nullable<ResizeObserver>>(null);
+  const setScrollElement = useCallback((element: Nullable<HTMLDivElement>) => {
+    setScrollElementState(element);
+    scrollbarObserver.current?.disconnect();
+    scrollbarObserver.current = null;
+
+    if (!element) {
+      setScrollbarWidth(0);
+      return;
+    }
+
+    const updateScrollbarWidth = () =>
+      setScrollbarWidth(element.offsetWidth - element.clientWidth);
+    updateScrollbarWidth();
+
+    scrollbarObserver.current = new ResizeObserver(updateScrollbarWidth);
+    scrollbarObserver.current.observe(element);
+  }, []);
 
   const leftMatches = useMemo(
     () => buildLineMatches(leftLines, search, linkifyUrls),
@@ -68,6 +98,77 @@ export function RawDiffViewer({
     () => buildLineMatches(rightLines, search, linkifyUrls),
     [rightLines, search, linkifyUrls],
   );
+  const leftRanges = useMemo(() => buildDiffRanges(leftLines), [leftLines]);
+  const rightRanges = useMemo(() => buildDiffRanges(rightLines), [rightLines]);
+
+  useLayoutEffect(() => {
+    const scroll = scrollElement;
+    const content = contentElement.current;
+    if (!scroll || !content) return;
+
+    const measureRanges = () => {
+      const contentTop = content.getBoundingClientRect().top;
+      const headerHeight =
+        content.querySelector<HTMLElement>("[data-diff-header]")
+          ?.offsetHeight ?? 0;
+      const contentHeight = Math.max(1, content.scrollHeight - headerHeight);
+      const lineCount = Math.max(leftLines.length, rightLines.length);
+      const indexes = new Set<number>();
+      for (const range of [...leftRanges, ...rightRanges]) {
+        indexes.add(range.start);
+        indexes.add(range.end);
+      }
+
+      const lineTops = new Map<number, number>();
+      for (const index of indexes) {
+        if (index >= lineCount) {
+          lineTops.set(index, contentHeight);
+          continue;
+        }
+
+        const row = content.querySelector<HTMLElement>(
+          `[data-diff-line-index="${index}"]`,
+        );
+        lineTops.set(
+          index,
+          row
+            ? Math.max(
+                0,
+                row.getBoundingClientRect().top - contentTop - headerHeight,
+              )
+            : contentHeight,
+        );
+      }
+
+      const toMeasuredRanges = (ranges: DiffRange[]) =>
+        ranges.map(({ start, end }) => {
+          const measuredStart = lineTops.get(start) ?? contentHeight;
+          const measuredEnd = lineTops.get(end) ?? contentHeight;
+          return {
+            start: measuredStart,
+            end: Math.max(measuredStart + 1, measuredEnd),
+          };
+        });
+
+      setMeasuredRanges({
+        left: toMeasuredRanges(leftRanges),
+        right: toMeasuredRanges(rightRanges),
+        contentHeight,
+        headerHeight,
+      });
+    };
+
+    measureRanges();
+    const observer = new ResizeObserver(measureRanges);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [
+    scrollElement,
+    leftLines.length,
+    rightLines.length,
+    leftRanges,
+    rightRanges,
+  ]);
 
   const leftNavigator = useRef(new SearchMatchNavigator());
   const rightNavigator = useRef(new SearchMatchNavigator());
@@ -110,61 +211,78 @@ export function RawDiffViewer({
 
   return (
     <div className={classNames("relative min-h-0 flex-1", className)}>
-      <div className="h-full overflow-auto px-1.5 pb-1.5">
-        <div className="bg-viewer-background sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2">
-          <DiffHeader label={leftLabel} active={activePane === "left"} />
-          <DiffHeader label={rightLabel} active={activePane === "right"} />
-        </div>
+      <div
+        ref={setScrollElement}
+        className="h-full overflow-auto px-1.5 pb-1.5"
+      >
+        <div ref={contentElement} className="relative">
+          <div
+            data-diff-header
+            className="bg-viewer-background sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2"
+          >
+            <DiffHeader label={leftLabel} active={activePane === "left"} />
+            <DiffHeader label={rightLabel} active={activePane === "right"} />
+          </div>
 
-        {leftLines.map((leftLine, index) => (
-          <DiffRow
-            key={index}
-            leftLine={leftLine}
-            rightLine={rightLines[index]}
-            leftMatches={leftMatches}
-            rightMatches={rightMatches}
-            lineIndex={index}
-            setActivePane={setActivePane}
-          />
-        ))}
+          {leftLines.map((leftLine, index) => (
+            <DiffRow
+              key={index}
+              leftLine={leftLine}
+              rightLine={rightLines[index]}
+              leftMatches={leftMatches}
+              rightMatches={rightMatches}
+              lineIndex={index}
+              setActivePane={setActivePane}
+            />
+          ))}
+        </div>
       </div>
 
-      <DiffOverviewRuler leftLines={leftLines} rightLines={rightLines} />
+      <DiffOverviewRuler
+        leftRanges={measuredRanges.left}
+        rightRanges={measuredRanges.right}
+        contentHeight={measuredRanges.contentHeight}
+        headerHeight={measuredRanges.headerHeight}
+        scrollbarWidth={scrollbarWidth}
+      />
     </div>
   );
 }
 
 type DiffOverviewRulerProps = {
-  leftLines: RawDiffLine[];
-  rightLines: RawDiffLine[];
+  leftRanges: DiffRange[];
+  rightRanges: DiffRange[];
+  contentHeight: number;
+  headerHeight: number;
+  scrollbarWidth: number;
 };
 
 function DiffOverviewRuler({
-  leftLines,
-  rightLines,
+  leftRanges,
+  rightRanges,
+  contentHeight,
+  headerHeight,
+  scrollbarWidth,
 }: DiffOverviewRulerProps): JSX.Element {
-  const lineCount = Math.max(leftLines.length, rightLines.length);
-  const leftRanges = useMemo(() => buildDiffRanges(leftLines), [leftLines]);
-  const rightRanges = useMemo(() => buildDiffRanges(rightLines), [rightLines]);
-
-  if (!lineCount || (!leftRanges.length && !rightRanges.length)) {
+  if (!leftRanges.length && !rightRanges.length) {
     return <></>;
   }
 
   return (
     <div
       aria-hidden="true"
-      className="bg-viewer-background/80 pointer-events-none absolute top-8 right-1 bottom-2 z-20 grid w-2 grid-cols-2 gap-px overflow-hidden rounded-sm p-px shadow-sm"
+      className="bg-viewer-background/80 pointer-events-none absolute bottom-2 z-20 grid w-2 grid-cols-2 gap-px overflow-hidden rounded-sm p-px shadow-sm"
+      style={{ top: headerHeight, right: scrollbarWidth + 4 }}
     >
       <DiffOverviewTrack
         className="bg-red-500/90"
         ranges={leftRanges}
-        lineCount={lineCount}
+        contentHeight={contentHeight}
       />
       <DiffOverviewTrack
         className="bg-emerald-500/90"
         ranges={rightRanges}
-        lineCount={lineCount}
+        contentHeight={contentHeight}
       />
     </div>
   );
@@ -175,16 +293,23 @@ type DiffRange = {
   end: number;
 };
 
+type MeasuredDiffRanges = {
+  left: DiffRange[];
+  right: DiffRange[];
+  contentHeight: number;
+  headerHeight: number;
+};
+
 type DiffOverviewTrackProps = {
   className: string;
   ranges: DiffRange[];
-  lineCount: number;
+  contentHeight: number;
 };
 
 function DiffOverviewTrack({
   className,
   ranges,
-  lineCount,
+  contentHeight,
 }: DiffOverviewTrackProps): JSX.Element {
   return (
     <div className="relative">
@@ -193,8 +318,8 @@ function DiffOverviewTrack({
           key={start}
           className={classNames("absolute inset-x-0 rounded-sm", className)}
           style={{
-            top: `${(start / lineCount) * 100}%`,
-            height: `max(3px, ${((end - start) / lineCount) * 100}%)`,
+            top: `${(start / contentHeight) * 100}%`,
+            height: `max(3px, ${((end - start) / contentHeight) * 100}%)`,
           }}
         />
       ))}
@@ -262,7 +387,10 @@ function DiffRow({
   setActivePane,
 }: DiffRowProps): JSX.Element {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2">
+    <div
+      data-diff-line-index={lineIndex}
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2"
+    >
       <DiffCell
         line={leftLine}
         matches={leftMatches}

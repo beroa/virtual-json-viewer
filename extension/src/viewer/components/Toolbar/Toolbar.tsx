@@ -16,7 +16,6 @@ import {
   SetStateAction,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import { JQCommandBox } from "./JQCommandBox";
@@ -44,8 +43,7 @@ export type ToolbarProps = Props<{
   setCompareControlsVisible?: Dispatch<SetStateAction<boolean>>;
   showParentKeys: boolean;
   setShowParentKeys: Dispatch<SetStateAction<boolean>>;
-  setCompareUrl?: (url: string) => void;
-  onCompare?: () => void;
+  onCompare?: (url: string) => void;
   onClearCompare?: () => void;
   ignorePatternText: string;
   setIgnorePatternText: (text: string) => void;
@@ -62,7 +60,6 @@ export function Toolbar({
   setCompareControlsVisible,
   showParentKeys,
   setShowParentKeys,
-  setCompareUrl,
   onCompare,
   onClearCompare,
   ignorePatternText,
@@ -70,8 +67,15 @@ export function Toolbar({
   className,
 }: ToolbarProps): JSX.Element {
   const t = useContext(TranslationContext);
+  const [compareUrlDraft, setCompareUrlDraft] = useState(
+    compareState?.url ?? "",
+  );
+  useEffect(() => {
+    setCompareUrlDraft(compareState?.url ?? "");
+  }, [compareState?.url]);
+
   const isTreeView = viewerModeState.value === ViewerMode.Tree;
-  const compareEnabled = !!compareState && !!setCompareUrl && !!onCompare;
+  const compareEnabled = !!compareState && !!onCompare;
   const isCompareControlsVisible = compareControlsVisible ?? false;
 
   return (
@@ -133,8 +137,9 @@ export function Toolbar({
             }
             icon={isCompareControlsVisible ? Icon.Close : Icon.Files}
             onClick={() => {
-              if (!isCompareControlsVisible)
-                setCompareUrl(window.location.href);
+              if (!isCompareControlsVisible) {
+                setCompareUrlDraft(window.location.href);
+              }
               setCompareControlsVisible((visible) => !visible);
             }}
           />
@@ -145,8 +150,9 @@ export function Toolbar({
         <CompareControls
           className="pt-1"
           compareState={compareState}
-          setCompareUrl={setCompareUrl}
-          onCompare={onCompare}
+          compareUrl={compareUrlDraft}
+          setCompareUrl={setCompareUrlDraft}
+          onCompare={() => onCompare(compareUrlDraft)}
           onClearCompare={onClearCompare!}
           showIgnoreLines={compareState.isDiffMode}
           ignorePatternText={ignorePatternText}
@@ -179,21 +185,8 @@ function IgnoreLinesControl({
   const t = useContext(TranslationContext).diffIgnore;
   const [dialogVisible, setDialogVisible] = useState(false);
   const [draftPatternText, setDraftPatternText] = useState(patternText);
+  const [draftInvalid, setDraftInvalid] = useState(false);
   const active = patternText.trim().length > 0;
-  const draftInvalid = useMemo(
-    () =>
-      draftPatternText.split("\n").some((line) => {
-        const source = line.trim();
-        if (!source) return false;
-        try {
-          new RegExp(source);
-          return false;
-        } catch {
-          return true;
-        }
-      }),
-    [draftPatternText],
-  );
 
   useEffect(() => {
     if (!dialogVisible) return;
@@ -217,6 +210,7 @@ function IgnoreLinesControl({
         aria-haspopup="dialog"
         onClick={() => {
           setDraftPatternText(patternText);
+          setDraftInvalid(false);
           setDialogVisible(true);
         }}
       >
@@ -244,7 +238,10 @@ function IgnoreLinesControl({
               className="bg-input-background text-input-foreground min-h-40 w-full resize-y rounded-sm px-2 py-1 font-mono"
               placeholder={t.placeholder}
               value={draftPatternText}
-              onChange={(event) => setDraftPatternText(event.target.value)}
+              onChange={(event) => {
+                setDraftPatternText(event.target.value);
+                setDraftInvalid(false);
+              }}
             />
             {draftInvalid && (
               <span className="text-sm text-red-300" role="alert">
@@ -257,6 +254,7 @@ function IgnoreLinesControl({
                 className="text-toolbar-foreground rounded-sm px-3 py-1"
                 onClick={() => {
                   setDraftPatternText("");
+                  setDraftInvalid(false);
                   onApply("");
                   setDialogVisible(false);
                 }}
@@ -275,6 +273,20 @@ function IgnoreLinesControl({
                 className="bg-toolbar-focus text-toolbar-foreground rounded-sm px-3 py-1 disabled:opacity-50"
                 disabled={draftInvalid}
                 onClick={() => {
+                  const invalid = draftPatternText.split("\n").some((line) => {
+                    const source = line.trim();
+                    if (!source) return false;
+                    try {
+                      new RegExp(source);
+                      return false;
+                    } catch {
+                      return true;
+                    }
+                  });
+                  if (invalid) {
+                    setDraftInvalid(true);
+                    return;
+                  }
                   onApply(draftPatternText);
                   setDialogVisible(false);
                 }}
@@ -295,6 +307,7 @@ function Separator(): JSX.Element {
 
 type CompareControlsProps = Props<{
   compareState: CompareState;
+  compareUrl: string;
   setCompareUrl: (url: string) => void;
   onCompare: () => void;
   onClearCompare: () => void;
@@ -305,6 +318,7 @@ type CompareControlsProps = Props<{
 
 function CompareControls({
   compareState,
+  compareUrl,
   setCompareUrl,
   onCompare,
   onClearCompare,
@@ -323,14 +337,14 @@ function CompareControls({
         className="border-input-background bg-input-background text-input-foreground placeholder-input-foreground/50 min-w-0 flex-1 rounded-sm border px-2 py-1 focus:outline-hidden"
         ref={focusCompareInput}
         placeholder={t.toolbar.compare.placeholder}
-        value={compareState.url}
+        value={compareUrl}
         onChange={onChange}
       />
 
       <button
         className="bg-toolbar-focus text-toolbar-foreground rounded-sm px-2 py-1 enabled:hover:cursor-pointer disabled:opacity-50"
         onClick={onCompare}
-        disabled={!compareState.url || compareState.isLoading}
+        disabled={!compareUrl || compareState.isLoading}
       >
         {compareState.isLoading
           ? t.toolbar.compare.loading

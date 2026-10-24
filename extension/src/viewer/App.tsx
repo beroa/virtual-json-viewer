@@ -300,9 +300,9 @@ function LoadedApp({
     setIgnorePatternText,
     showParentKeys,
     setShowParentKeys,
-    setCompareUrl: (url: string) => state.compareUrl.setValue(url),
-    onCompare: () => {
-      if (!state.compareUrl.value) return;
+    onCompare: (url: string) => {
+      if (!url) return;
+      state.compareUrl.setValue(url);
       setCompareControlsVisible(true);
       state.diffMode.setValue(true);
       state.viewerMode.setValue(ViewerMode.Raw);

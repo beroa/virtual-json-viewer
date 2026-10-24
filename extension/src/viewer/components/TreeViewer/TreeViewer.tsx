@@ -83,6 +83,29 @@ export function TreeViewer({
   // It changes when the content is (re)loaded.
   const [tree, treeRef] = useReactiveRef<TreeHandler>();
   const [parentKeys, setParentKeys] = useState<ParentKey[]>([]);
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  const scrollbarObserver = useRef<Nullable<ResizeObserver>>(null);
+
+  const setScrollElement = useCallback(
+    (element: Nullable<HTMLElement>) => {
+      onScrollElementChange?.(element);
+      scrollbarObserver.current?.disconnect();
+      scrollbarObserver.current = null;
+
+      if (!element) {
+        setScrollbarWidth(0);
+        return;
+      }
+
+      const updateScrollbarWidth = () =>
+        setScrollbarWidth(element.offsetWidth - element.clientWidth);
+      updateScrollbarWidth();
+
+      scrollbarObserver.current = new ResizeObserver(updateScrollbarWidth);
+      scrollbarObserver.current.observe(element);
+    },
+    [onScrollElementChange],
+  );
 
   // Track tree element size
   const [parent, parentRef] = useReactiveRef<HTMLDivElement>();
@@ -292,7 +315,10 @@ export function TreeViewer({
       onKeyDown={onKeydown}
     >
       {showParentKeys && parentKeys.length > 0 && (
-        <div className="bg-viewer-background text-json-key border-toolbar-foreground/20 z-10 shrink-0 border-b py-1 shadow-sm">
+        <div
+          className="bg-viewer-background text-json-key border-toolbar-foreground/20 absolute top-0 left-0 z-10 border-b py-1 shadow-sm"
+          style={{ right: scrollbarWidth }}
+        >
           {parentKeys.map(({ key, nesting, nodeId }, index) => (
             <button
               key={index}
@@ -315,7 +341,7 @@ export function TreeViewer({
           context={context}
           restoreSnapshotRequest={restoreSnapshotRequest}
           onRestoreSnapshotApplied={clearRestoreSnapshotRequest}
-          onScrollElementChange={onScrollElementChange}
+          onScrollElementChange={setScrollElement}
           onVisibleRowChange={updateParentKeysForVisibleRow}
         >
           {TreeNode}
