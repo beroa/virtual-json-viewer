@@ -77,16 +77,7 @@ export function compareRawLines(
   leftLines: string[],
   rightLines: string[],
 ): RawDiffResult {
-  const left = leftLines.map((text, index) => ({
-    text,
-    lineNumber: index + 1,
-  }));
-  const right = rightLines.map((text, index) => ({
-    text,
-    lineNumber: index + 1,
-  }));
-
-  return buildJsDiffRawDiff(left, right);
+  return buildJsDiffRawDiff(leftLines, rightLines);
 }
 
 function compareAtPaths(
@@ -183,55 +174,70 @@ function compareAtPaths(
   return hasDiff;
 }
 
-function buildJsDiffRawDiff(
-  left: Array<{ text: string; lineNumber: number }>,
-  right: Array<{ text: string; lineNumber: number }>,
-): RawDiffResult {
+function buildJsDiffRawDiff(left: string[], right: string[]): RawDiffResult {
   const leftLines: RawDiffLine[] = [];
   const rightLines: RawDiffLine[] = [];
-  const changes = diffArrays(left, right, {
-    comparator: (leftLine, rightLine) => leftLine.text === rightLine.text,
-  });
+  const changes = diffArrays(left, right);
+  let leftIndex = 0;
+  let rightIndex = 0;
 
   for (let index = 0; index < changes.length; index++) {
     const change = changes[index];
     const nextChange = changes[index + 1];
 
     if (change.removed && nextChange?.added) {
-      appendChangedBlock(change.value, nextChange.value, leftLines, rightLines);
+      appendChangedBlock(
+        change.value,
+        nextChange.value,
+        leftIndex,
+        rightIndex,
+        leftLines,
+        rightLines,
+      );
+      leftIndex += change.value.length;
+      rightIndex += nextChange.value.length;
       index++;
       continue;
     }
 
     if (change.added && nextChange?.removed) {
-      appendChangedBlock(nextChange.value, change.value, leftLines, rightLines);
+      appendChangedBlock(
+        nextChange.value,
+        change.value,
+        leftIndex,
+        rightIndex,
+        leftLines,
+        rightLines,
+      );
+      leftIndex += nextChange.value.length;
+      rightIndex += change.value.length;
       index++;
       continue;
     }
 
     if (change.removed) {
       change.value.forEach((line) =>
-        appendRemovedLine(line, leftLines, rightLines),
+        appendRemovedLine(line, ++leftIndex, leftLines, rightLines),
       );
       continue;
     }
 
     if (change.added) {
       change.value.forEach((line) =>
-        appendAddedLine(line, leftLines, rightLines),
+        appendAddedLine(line, ++rightIndex, leftLines, rightLines),
       );
       continue;
     }
 
     change.value.forEach((line) => {
       leftLines.push({
-        text: line.text,
-        lineNumber: line.lineNumber,
+        text: line,
+        lineNumber: ++leftIndex,
         kind: DiffKind.Same,
       });
       rightLines.push({
-        text: line.text,
-        lineNumber: line.lineNumber,
+        text: line,
+        lineNumber: ++rightIndex,
         kind: DiffKind.Same,
       });
     });
@@ -244,8 +250,10 @@ function buildJsDiffRawDiff(
 }
 
 function appendChangedBlock(
-  leftSegment: Array<{ text: string; lineNumber: number }>,
-  rightSegment: Array<{ text: string; lineNumber: number }>,
+  leftSegment: string[],
+  rightSegment: string[],
+  leftStartIndex: number,
+  rightStartIndex: number,
   leftLines: RawDiffLine[],
   rightLines: RawDiffLine[],
 ) {
@@ -254,40 +262,51 @@ function appendChangedBlock(
   for (let index = 0; index < pairCount; index++) {
     const leftLine = leftSegment[index];
     const rightLine = rightSegment[index];
-    const inlineDiff = buildInlineDiffs(leftLine.text, rightLine.text);
+    const inlineDiff = buildInlineDiffs(leftLine, rightLine);
 
     leftLines.push({
-      text: leftLine.text,
-      lineNumber: leftLine.lineNumber,
+      text: leftLine,
+      lineNumber: leftStartIndex + index + 1,
       kind: DiffKind.Removed,
       inlineDiffs: inlineDiff.left,
     });
     rightLines.push({
-      text: rightLine.text,
-      lineNumber: rightLine.lineNumber,
+      text: rightLine,
+      lineNumber: rightStartIndex + index + 1,
       kind: DiffKind.Added,
       inlineDiffs: inlineDiff.right,
     });
   }
 
-  leftSegment
-    .slice(pairCount)
-    .forEach((line) => appendRemovedLine(line, leftLines, rightLines));
-  rightSegment
-    .slice(pairCount)
-    .forEach((line) => appendAddedLine(line, leftLines, rightLines));
+  for (let index = pairCount; index < leftSegment.length; index++) {
+    appendRemovedLine(
+      leftSegment[index],
+      leftStartIndex + index + 1,
+      leftLines,
+      rightLines,
+    );
+  }
+  for (let index = pairCount; index < rightSegment.length; index++) {
+    appendAddedLine(
+      rightSegment[index],
+      rightStartIndex + index + 1,
+      leftLines,
+      rightLines,
+    );
+  }
 }
 
 function appendRemovedLine(
-  line: { text: string; lineNumber: number },
+  text: string,
+  lineNumber: number,
   leftLines: RawDiffLine[],
   rightLines: RawDiffLine[],
 ) {
   leftLines.push({
-    text: line.text,
-    lineNumber: line.lineNumber,
+    text,
+    lineNumber,
     kind: DiffKind.Removed,
-    inlineDiffs: fullLineDiff(line.text, DiffKind.Removed),
+    inlineDiffs: fullLineDiff(text, DiffKind.Removed),
   });
   rightLines.push({
     text: "",
@@ -298,7 +317,8 @@ function appendRemovedLine(
 }
 
 function appendAddedLine(
-  line: { text: string; lineNumber: number },
+  text: string,
+  lineNumber: number,
   leftLines: RawDiffLine[],
   rightLines: RawDiffLine[],
 ) {
@@ -309,10 +329,10 @@ function appendAddedLine(
     placeholder: true,
   });
   rightLines.push({
-    text: line.text,
-    lineNumber: line.lineNumber,
+    text,
+    lineNumber,
     kind: DiffKind.Added,
-    inlineDiffs: fullLineDiff(line.text, DiffKind.Added),
+    inlineDiffs: fullLineDiff(text, DiffKind.Added),
   });
 }
 
@@ -368,6 +388,19 @@ function alignArrayValues(
 ): Array<{ leftIndex?: number; rightIndex?: number }> {
   const leftTokens = left.map(arrayAlignmentToken);
   const rightTokens = right.map(arrayAlignmentToken);
+
+  if (
+    leftTokens.length === rightTokens.length &&
+    leftTokens.every(
+      (token, index) => token !== null && token === rightTokens[index],
+    )
+  ) {
+    return leftTokens.map((_token, index) => ({
+      leftIndex: index,
+      rightIndex: index,
+    }));
+  }
+
   const anchors = findAnchors(
     leftTokens,
     rightTokens,

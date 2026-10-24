@@ -54,6 +54,11 @@ import {
 
 // heuristic: https://media.tenor.com/6PFS7ABeJGEAAAAC/dr-evil-one-billion-dollars.gif
 const LARGE_JSON_LENGTH = 1_000_000;
+const EMPTY_DIFF_RESULT: Diff.DiffResult = {
+  left: {},
+  right: {},
+  hasDiff: false,
+};
 
 export type AppProps = {
   jsonText: string;
@@ -195,8 +200,18 @@ function LoadedApp({
     ) {
       return null;
     }
+
+    if (state.viewerMode.value === ViewerMode.Raw) {
+      return EMPTY_DIFF_RESULT;
+    }
+
     return Diff.compareJsonLines(jsonLines, compareJsonLines);
-  }, [state.diffMode.value, jsonLines, compareJsonLines]);
+  }, [
+    state.diffMode.value,
+    state.viewerMode.value,
+    jsonLines,
+    compareJsonLines,
+  ]);
 
   const [leftSearchNavigation, setLeftSearchNavigation] = useState(
     EmptySearchNavigation,
@@ -385,24 +400,28 @@ function DiffModeView({
   showParentKeys,
 }: DiffModeViewProps): JSX.Element {
   const { indentation, sortKeys, textSize } = useContext(SettingsContext);
+  const isRawMode = state.viewerMode.value === ViewerMode.Raw;
 
-  const leftRawLines = useMemo(
-    () =>
-      jsonLines.flatMap((line) =>
-        Json.toString(line, { sortKeys, space: indentation }).split("\n"),
-      ),
-    [jsonLines, sortKeys, indentation],
-  );
-  const rightRawLines = useMemo(
-    () =>
-      compareJsonLines.flatMap((line) =>
-        Json.toString(line, { sortKeys, space: indentation }).split("\n"),
-      ),
-    [compareJsonLines, sortKeys, indentation],
-  );
+  const leftRawLines = useMemo(() => {
+    if (!isRawMode) return [];
+
+    return jsonLines.flatMap((line) =>
+      Json.toString(line, { sortKeys, space: indentation }).split("\n"),
+    );
+  }, [isRawMode, jsonLines, sortKeys, indentation]);
+  const rightRawLines = useMemo(() => {
+    if (!isRawMode) return [];
+
+    return compareJsonLines.flatMap((line) =>
+      Json.toString(line, { sortKeys, space: indentation }).split("\n"),
+    );
+  }, [isRawMode, compareJsonLines, sortKeys, indentation]);
   const rawDiff = useMemo(
-    () => Diff.compareRawLines(leftRawLines, rightRawLines),
-    [leftRawLines, rightRawLines],
+    () =>
+      isRawMode
+        ? Diff.compareRawLines(leftRawLines, rightRawLines)
+        : { left: [], right: [] },
+    [isRawMode, leftRawLines, rightRawLines],
   );
 
   return (
