@@ -1,5 +1,11 @@
-import { DiffByPath, RawDiffLine } from "@/viewer/commons/Diff";
+import {
+  compareJsonLines,
+  DiffByPath,
+  ignoreRawDiffLines,
+  RawDiffLine,
+} from "@/viewer/commons/Diff";
 import * as Json from "@/viewer/commons/Json";
+import { TranslationContext } from "@/viewer/localization";
 import { Search, SearchNavigation, ViewerMode } from "@/viewer/state";
 import classNames from "classnames";
 import {
@@ -8,7 +14,9 @@ import {
   ReactNode,
   SetStateAction,
   useCallback,
+  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -57,6 +65,35 @@ export function DiffViewer({
   setActivePane,
   className,
 }: DiffViewerProps): JSX.Element {
+  const t = useContext(TranslationContext).diffIgnore;
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const [patternText, setPatternText] = useState("");
+  const pattern = useMemo(() => {
+    if (!patternText) return null;
+    try {
+      return new RegExp(patternText);
+    } catch {
+      return null;
+    }
+  }, [patternText]);
+  const invalid = !!patternText && !pattern;
+  const filteredRaw = useMemo(
+    () =>
+      pattern
+        ? ignoreRawDiffLines(
+            { left: leftRawLines, right: rightRawLines },
+            pattern,
+          )
+        : { left: leftRawLines, right: rightRawLines },
+    [leftRawLines, rightRawLines, pattern],
+  );
+  const filteredTree = useMemo(
+    () =>
+      pattern
+        ? compareJsonLines(leftJsonLines, rightJsonLines, pattern)
+        : { left: leftDiffByPath, right: rightDiffByPath },
+    [leftJsonLines, rightJsonLines, leftDiffByPath, rightDiffByPath, pattern],
+  );
   const [leftScrollElement, setLeftScrollElement] =
     useState<Nullable<HTMLElement>>(null);
   const [rightScrollElement, setRightScrollElement] =
@@ -72,12 +109,12 @@ export function DiffViewer({
     [],
   );
 
-  if (viewerMode === ViewerMode.Raw) {
-    return (
+  const viewer =
+    viewerMode === ViewerMode.Raw ? (
       <RawDiffViewer
         className={className}
-        leftLines={leftRawLines}
-        rightLines={rightRawLines}
+        leftLines={filteredRaw.left}
+        rightLines={filteredRaw.right}
         search={search}
         isLargeJsonLeft={isLargeJsonLeft}
         isLargeJsonRight={isLargeJsonRight}
@@ -89,53 +126,89 @@ export function DiffViewer({
         leftLabel={leftLabel}
         rightLabel={rightLabel}
       />
+    ) : (
+      <div
+        className={classNames(
+          "flex min-h-0 flex-1 gap-2 overflow-hidden px-1.5 pb-1.5",
+          className,
+        )}
+      >
+        <DiffPane
+          className="min-w-0 flex-1"
+          label={leftLabel}
+          active={activePane === "left"}
+          onActivate={() => setActivePane("left")}
+        >
+          <TreeViewer
+            className="text-viewer-foreground h-full min-h-0 flex-1 pt-1.5 pl-1.5 selection:bg-amber-200 selection:text-black"
+            jsonLines={leftJsonLines}
+            enableEnterNode={false}
+            search={search}
+            setSearchNavigation={setLeftSearchNavigation}
+            searchStartingIndex={searchStartingIndex}
+            viewerId="left"
+            diffByPath={filteredTree.left}
+            onScrollElementChange={setLeftScrollElementStable}
+          />
+        </DiffPane>
+
+        <DiffPane
+          className="min-w-0 flex-1"
+          label={rightLabel}
+          active={activePane === "right"}
+          onActivate={() => setActivePane("right")}
+        >
+          <TreeViewer
+            className="text-viewer-foreground h-full min-h-0 flex-1 pt-1.5 pl-1.5 selection:bg-amber-200 selection:text-black"
+            jsonLines={rightJsonLines}
+            enableEnterNode={false}
+            search={search}
+            setSearchNavigation={setRightSearchNavigation}
+            searchStartingIndex={searchStartingIndex}
+            viewerId="right"
+            diffByPath={filteredTree.right}
+            onScrollElementChange={setRightScrollElementStable}
+          />
+        </DiffPane>
+      </div>
     );
-  }
-
   return (
-    <div
-      className={classNames(
-        "flex min-h-0 flex-1 gap-2 overflow-hidden px-1.5 pb-1.5",
-        className,
-      )}
-    >
-      <DiffPane
-        className="min-w-0 flex-1"
-        label={leftLabel}
-        active={activePane === "left"}
-        onActivate={() => setActivePane("left")}
-      >
-        <TreeViewer
-          className="text-viewer-foreground h-full min-h-0 flex-1 pt-1.5 pl-1.5 selection:bg-amber-200 selection:text-black"
-          jsonLines={leftJsonLines}
-          enableEnterNode={false}
-          search={search}
-          setSearchNavigation={setLeftSearchNavigation}
-          searchStartingIndex={searchStartingIndex}
-          viewerId="left"
-          diffByPath={leftDiffByPath}
-          onScrollElementChange={setLeftScrollElementStable}
-        />
-      </DiffPane>
-
-      <DiffPane
-        className="min-w-0 flex-1"
-        label={rightLabel}
-        active={activePane === "right"}
-        onActivate={() => setActivePane("right")}
-      >
-        <TreeViewer
-          className="text-viewer-foreground h-full min-h-0 flex-1 pt-1.5 pl-1.5 selection:bg-amber-200 selection:text-black"
-          jsonLines={rightJsonLines}
-          enableEnterNode={false}
-          search={search}
-          setSearchNavigation={setRightSearchNavigation}
-          searchStartingIndex={searchStartingIndex}
-          viewerId="right"
-          diffByPath={rightDiffByPath}
-          onScrollElementChange={setRightScrollElementStable}
-        />
-      </DiffPane>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="bg-toolbar-background text-toolbar-foreground flex flex-wrap items-center gap-2 px-2 py-1">
+        <button
+          type="button"
+          className="bg-toolbar-focus rounded-sm px-2 py-1"
+          aria-expanded={controlsVisible}
+          onClick={() => setControlsVisible(!controlsVisible)}
+        >
+          {pattern ? t.active : t.button}
+        </button>
+        {controlsVisible && (
+          <>
+            <input
+              autoFocus
+              aria-label={t.button}
+              aria-invalid={invalid}
+              aria-describedby="diff-ignore-help"
+              className="bg-input-background text-input-foreground min-w-48 flex-1 rounded-sm px-2 py-1"
+              placeholder={t.placeholder}
+              value={patternText}
+              onChange={(event) => setPatternText(event.target.value)}
+            />
+            <button type="button" onClick={() => setPatternText("")}>
+              {t.clear}
+            </button>
+            <span
+              id="diff-ignore-help"
+              className="w-full text-sm"
+              role={invalid ? "alert" : undefined}
+            >
+              {invalid ? t.invalid : t.help}
+            </span>
+          </>
+        )}
+      </div>
+      {viewer}
     </div>
   );
 }

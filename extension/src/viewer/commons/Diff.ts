@@ -51,6 +51,7 @@ const LCS_MATRIX_LIMIT = 120_000;
 export function compareJsonLines(
   leftLines: Json.Lines,
   rightLines: Json.Lines,
+  ignorePattern?: RegExp,
 ): DiffResult {
   const result: DiffResult = {
     left: {},
@@ -64,8 +65,11 @@ export function compareJsonLines(
     ".",
     ".",
     result,
+    ignorePattern,
   );
 
+  result.hasDiff =
+    Object.keys(result.left).length > 0 || Object.keys(result.right).length > 0;
   return result;
 }
 
@@ -91,25 +95,45 @@ function compareAtPaths(
   leftPath: string,
   rightPath: string,
   result: DiffResult,
+  ignorePattern?: RegExp,
+  nodeKey?: string,
 ): boolean {
+  const ignored =
+    matchesNodeLine(left, nodeKey, ignorePattern) ||
+    matchesNodeLine(right, nodeKey, ignorePattern);
   if (left === undefined) {
-    markSubtree(right!, rightPath, result.right, DiffKind.Added);
+    markSubtree(
+      right!,
+      rightPath,
+      result.right,
+      DiffKind.Added,
+      ignorePattern,
+      nodeKey,
+    );
     return true;
   }
 
   if (right === undefined) {
-    markSubtree(left, leftPath, result.left, DiffKind.Removed);
+    markSubtree(
+      left,
+      leftPath,
+      result.left,
+      DiffKind.Removed,
+      ignorePattern,
+      nodeKey,
+    );
     return true;
   }
 
   if (!sameNodeType(left, right)) {
+    if (ignored) return false;
     markPath(result.left, leftPath, DiffKind.TypeChanged);
     markPath(result.right, rightPath, DiffKind.TypeChanged);
     return true;
   }
 
   if (Json.isLiteral(left) && Json.isLiteral(right)) {
-    if (Object.is(left, right)) {
+    if (ignored || Object.is(left, right)) {
       return false;
     }
 
@@ -133,6 +157,7 @@ function compareAtPaths(
             ? rightPath
             : childPath(rightPath, pair.rightIndex),
           result,
+          ignorePattern,
         ) || hasDiff;
     }
 
@@ -149,6 +174,8 @@ function compareAtPaths(
           childPath(leftPath, key),
           childPath(rightPath, key),
           result,
+          ignorePattern,
+          key,
         ) || hasDiff;
     }
   }
@@ -460,19 +487,29 @@ function markSubtree(
   path: string,
   target: DiffByPath,
   kind: DiffKind.Added | DiffKind.Removed,
+  ignorePattern?: RegExp,
+  nodeKey?: string,
 ) {
-  markPath(target, path, kind);
+  if (!matchesNodeLine(root, nodeKey, ignorePattern))
+    markPath(target, path, kind);
 
   if (Json.isArray(root)) {
     root.forEach((value, index) =>
-      markSubtree(value, childPath(path, index), target, kind),
+      markSubtree(value, childPath(path, index), target, kind, ignorePattern),
     );
     return;
   }
 
   if (Json.isObject(root)) {
     root.keys.forEach((key) =>
-      markSubtree(root.content[key], childPath(path, key), target, kind),
+      markSubtree(
+        root.content[key],
+        childPath(path, key),
+        target,
+        kind,
+        ignorePattern,
+        key,
+      ),
     );
   }
 }
@@ -516,4 +553,40 @@ function sameNodeType(left: Json.Root, right: Json.Root): boolean {
   }
 
   return typeof left === typeof right || (left === null && right === null);
+}
+
+// Match only this tree row, not text belonging to its descendants.
+function matchesNodeLine(
+  root: MaybeRoot,
+  nodeKey: string | undefined,
+  pattern?: RegExp,
+): boolean {
+  if (root === undefined || !pattern) return false;
+  const key = nodeKey === undefined ? "" : `${JSON.stringify(nodeKey)}: `;
+  const value = Json.isLeaf(root)
+    ? Json.toString(root)
+    : Json.isArray(root)
+      ? "["
+      : "{";
+  pattern.lastIndex = 0;
+  return pattern.test(key + value);
+}
+
+export function ignoreRawDiffLines(
+  result: RawDiffResult,
+  pattern: RegExp,
+): RawDiffResult {
+  const left = [...result.left];
+  const right = [...result.right];
+  left.forEach((line, index) => {
+    const matches = (candidate: RawDiffLine) => {
+      pattern.lastIndex = 0;
+      return !candidate.placeholder && pattern.test(candidate.text);
+    };
+    if (matches(line) || matches(right[index])) {
+      left[index] = { ...line, kind: DiffKind.Same, inlineDiffs: [] };
+      right[index] = { ...right[index], kind: DiffKind.Same, inlineDiffs: [] };
+    }
+  });
+  return { left, right };
 }
