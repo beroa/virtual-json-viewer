@@ -7,42 +7,42 @@ const FAVICON_URL = chrome.runtime.getURL("assets/logo/16.png");
 const CONTENT_CSS_URL = chrome.runtime.getURL("assets/content.css");
 
 export function loadIncrementally() {
-  DomEvents.headAvailable().then(setupResources);
-  DomEvents.documentLoaded().then(loadViewer);
+  DomEvents.bodyAvailable()
+    .then(() => {
+      showLoading();
+      return Promise.all([setupResources(), DomEvents.documentLoaded()]);
+    })
+    .then(loadViewer)
+    .catch(handleLoadError);
 }
 
 export function tryLoadAfterDocumentLoaded() {
   DomEvents.documentLoaded()
     .then(checkResourcesAccess)
     .then(forceSetupAndLoadViewer)
-    .catch((error) => {
-      console.warn(`Virtual Json Viewer activation failed: ${error.message}`);
-    });
+    .catch(handleLoadError);
 }
 
-function setupResources() {
-  if (document.readyState === "loading") {
-    setLoading(true);
-  }
-
+function setupResources(): Promise<void> {
   addFavicon(FAVICON_URL);
   updateTitle();
-
-  addCSSRef(CONTENT_CSS_URL);
+  return DomEvents.loadStylesheet(CONTENT_CSS_URL);
 }
 
 function loadViewer() {
   const jsonElement = document.getElementsByTagName("pre")[0];
+  if (!jsonElement) throw new Error("JSON expected but not found");
   renderViewer(jsonElement.innerText);
 }
 
-function forceSetupAndLoadViewer() {
+async function forceSetupAndLoadViewer() {
   const jsonText = tryFindJsonText();
   if (!jsonText) {
     throw new Error("JSON expected but not found");
   }
 
-  setupResources();
+  showLoading();
+  await setupResources();
   renderViewer(jsonText);
 }
 
@@ -58,46 +58,33 @@ async function checkResourcesAccess(): Promise<void> {
   }
 }
 
-function setLoading(isLoading: boolean) {
-  setLoadingMessage(isLoading);
-  // workaround: improve loading time on large json
-  setTextVisibility(!isLoading);
+const LOADING_ID = "virtual-json-viewer-loading";
+
+function showLoading() {
+  if (document.getElementById(LOADING_ID)) return;
+
+  const loading = document.createElement("div");
+  loading.id = LOADING_ID;
+  loading.setAttribute("role", "status");
+  loading.setAttribute("aria-label", "Loading JSON viewer");
+  const label = document.createElement("span");
+  label.textContent = "Loading JSON viewer...";
+  const track = document.createElement("div");
+  track.className = "track";
+  const bar = document.createElement("div");
+  bar.className = "bar";
+  track.appendChild(bar);
+  loading.append(label, track);
+  document.body.appendChild(loading);
 }
 
-function setLoadingMessage(show: boolean) {
-  if (show) {
-    const elem = document.createElement("div");
-    elem.id = "loading";
-    elem.innerText = "Loading...";
-    document.body.appendChild(elem);
-  } else {
-    const elem = document.getElementById("loading");
-    elem?.parentNode?.removeChild(elem);
-  }
+function hideLoading() {
+  document.getElementById(LOADING_ID)?.remove();
 }
 
-function setTextVisibility(visible: boolean) {
-  if (visible) {
-    const elem = document.getElementById("hide-text");
-    elem?.parentNode?.removeChild(elem);
-  } else {
-    addCSS("pre { display: none; }", "hide-text");
-  }
-}
-
-function addCSS(style: string, id?: string) {
-  const styleElement = document.createElement("style");
-  styleElement.innerHTML = style;
-  if (id) styleElement.id = id;
-  document.head.appendChild(styleElement);
-}
-
-function addCSSRef(href: string) {
-  const linkElement = document.createElement("link");
-  linkElement.href = href;
-  linkElement.type = "text/css";
-  linkElement.rel = "stylesheet";
-  document.head.appendChild(linkElement);
+function handleLoadError(error: unknown) {
+  hideLoading();
+  console.warn("Virtual Json Viewer activation failed:", error);
 }
 
 function addFavicon(href: string) {
@@ -116,14 +103,14 @@ function updateTitle() {
 
 function renderViewer(jsonText: string) {
   const reactRoot = replaceBodyContent();
-  setLoading(false);
-  reactRoot.render(<ViewerApp jsonText={jsonText} />);
+  reactRoot.render(<ViewerApp jsonText={jsonText} onReady={hideLoading} />);
 }
 
 function replaceBodyContent(): Root {
   const div = document.createElement("div");
   div.style.cssText = "height: 100vh";
-  document.body.replaceChildren(div);
+  const loading = document.getElementById(LOADING_ID);
+  document.body.replaceChildren(div, ...(loading ? [loading] : []));
   return createRoot(div);
 }
 

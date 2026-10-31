@@ -2,7 +2,7 @@
 
 # ![logo](assets/logo_48.png) Virtual Json Viewer
 
-Browser plugin that uses [virtual DOM](https://github.com/bvaughn/react-window) to render JSONs with built-in search, JQ filtering and many other [features](#features).
+Browser extension that uses [list virtualization](https://github.com/bvaughn/react-window) to render JSON with built-in search, JQ filtering, and other [features](#features).
 
 ![preview](assets/preview.png)
 
@@ -18,7 +18,7 @@ Rightful question, and the answer is quite simple: the others weren't good enoug
 
 ## Features
 
-- [X] [Blazing fast](#performance) JSON rendering using virtual DOM
+- [X] Virtualized JSON rendering
     - [X] Color-encoded value types
     - [X] Collapse/expand all nodes
     - [X] Preview nested item count for closed nodes
@@ -30,6 +30,9 @@ Rightful question, and the answer is quite simple: the others weren't good enoug
     - [X] Option to completely hide subtrees without any search match
     - [X] Option to enable case sensitive search
 - [X] JQ filtering
+- [X] Compare JSON from a URL side by side
+    - [X] Highlight structural and raw text differences
+    - [X] Ignore diff rows with regular expression patterns
 - [X] Raw JSON viewer
     - [X] Prettify/minify 
 - [X] Support [JSON Lines](https://jsonlines.org/)
@@ -132,7 +135,7 @@ See also [Issue #15](https://github.com/paolosimone/virtual-json-viewer/issues/1
 
 > Unexpected token { in JSON at position 337
 
-Why? The core feature of Virtual Json Viewer is the navigation of (possibly large) json thanks to virtual DOM that allows on-demand rendering. JQ filtering has been added on top of that, just as handy utilities to further improve the user experience.
+Why? The core feature of Virtual Json Viewer is navigating possibly large JSON documents through virtualized list rendering. JQ filtering has been added on top of that, just as handy utilities to further improve the user experience.
 
 ### Why the content shown by the extension is different from the actual JSON?
 
@@ -158,7 +161,7 @@ JSON.parse('{"wrong": 1.12345678901234567890}')
 
 #### Keys order is not preserved 
 
-Even disabling the alphabetical ordering feature flag there is no guarantee that the order of keys on screen will be the same as the original json. The actual order will be the output of `Object.keys(JSON.parse(json))`. For instance by ECMAScript specification integer-like keys will be iterated first ([MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...in#:~:text=The%20traversal%20order,of%20property%20creation.))
+Even with alphabetical sorting disabled, there is no guarantee that the order of keys on screen will be the same as the original JSON. The actual order will be the output of `Object.keys(JSON.parse(json))`. For instance, ECMAScript iterates integer-like keys first ([MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...in#:~:text=The%20traversal%20order,of%20property%20creation.)).
 
 ```javascript
 Object.keys(JSON.parse('{"ZZZ": "_", "AAA": "_", "42": "_"}'))
@@ -212,9 +215,9 @@ Load extension
 
 *Note:* The extension is automatically removed when Firefox is closed and must be manually loaded on next start.
 
-#### Others
+#### Other browsers
 
-The extension has not been tested on other browsers, but should work on any chromium browser.
+Only Chrome and Firefox builds are provided. Other browsers have not been tested.
 
 ## Contributing
 
@@ -244,31 +247,6 @@ Run `yarn dev` to serve the extension as a web app with hot reload.
 
 Always `yarn format` before creating a commit.
 
-## Performance
-
-*Disclaimer*: this is NOT a formal benchmark, just a few tests with syntethic data to give an idea of loading performance time.
-
-**Setup**
-
-- Virtual Json Viewer v2.0.0 
-- Macbook Pro 16 (Nov 2023) Apple M3 Pro 18 GB
-- Chrome 139.0.7258.128
-- Jsons are randomly generated using [this script](./samples/random_json.py) (fixed dept: 10)
-- Files are loaded from disk
-- Load time recorded with Chrome DevTool
-    1. Open file in chrome
-    1. From "Performance" -> "Insights" tab click "Record and reload"
-    1. Take the "Largest Contentful Paint" (LCP)
-
-**Results**
-
-| Siblings per level | File Size      | Load time       |
-|--------------------|----------------|-----------------|
-| 10                 | ~100 KB        | ~150 ms         |
-| 100                | ~1 MB          | ~150 ms         |
-| 1000               | ~10 MB         | ~450 ms         |
-| 10000              | ~100 MB        | ~4000 ms        |
-
 ## References
 
 |Tool                                                                           |Usage                                          |
@@ -288,3 +266,40 @@ Always `yarn format` before creating a commit.
 ## License
 
 MIT License. See also [LICENSE](LICENSE) file.
+
+## Pinned parent scrolling
+
+The reference behavior is commit `c120d73c84bedf9ceb5a7e7b63a6190dd167aa0b`.
+The pinned strip is a normal-flow, non-shrinking sibling above the tree. The tree
+fills the remaining height. Do not turn the strip into an overlay: doing so covers
+rows and changes when their parents appear to leave the visible content area.
+
+Parent selection uses the first rendered row intersecting the tree's own scroll
+viewport. Only expanded ancestors, including that row itself if expanded, can
+pin. For each ancestor, progress is the portion of its original row that has
+crossed the top of that same tree viewport, clamped from zero to one. A parent
+above the virtualized rendered range is fully pinned. Each pinned row's height
+is its measured original height multiplied by progress; the strip height is
+the sum. Its lower horizontal edge therefore grows and recedes directly with
+scrolling, without a timed animation or an additional ancestor-slot offset.
+
+The scroll viewport starts **below** the strip. Its moving top must be measured
+from the scroll element, not from the outer viewer. Do not substitute the bottom
+of an overlay or feed previous header height into the progress calculation.
+The implementation is in `extension/src/viewer/components/TreeViewer/TreeViewer.tsx`.
+`FullHeightScrollbar.tsx` places a synchronized native scrollbar over the panel's
+right edge, spanning both the strip and tree. Its scroll distance equals the
+tree's `scrollHeight - clientHeight`, even when pinning resizes the tree viewport.
+The tree retains its native scrolling and original viewport geometry; the separate
+rail covers its shorter vertical scrollbar. Changes to this rail must not change
+the parent progress calculation or turn the strip into an overlay.
+
+When changing this feature, compare against the reference commit in Chrome:
+
+- Scroll slowly through `data.attributes.authors.0` in both directions. Parent
+  rows must move into and out of the strip as they cross the tree viewport top.
+- Confirm the strip bottom and the tree viewport top meet without covering rows.
+- A sibling such as `dates` must not pin before its original row starts crossing
+  that edge; collapsed nodes must stay out of the strip.
+- Return to the top and confirm the strip clears. Click a pinned parent and
+  confirm its original row is revealed. Check that the final JSON row is reachable.

@@ -16,7 +16,7 @@ Use Yarn for project commands.
 - `yarn fix`: run Prettier, TypeScript checking, and ESLint auto-fixes.
 - `yarn clean`: remove generated files from `dist/`.
 
-There is no `test` script; use `yarn tsc --noEmit` and `yarn eslint .` as minimum validation.
+Run `yarn test` for the Node.js test suite. Use `yarn tsc --noEmit` and `yarn eslint .` as minimum static validation.
 
 ## Coding Style & Naming Conventions
 
@@ -26,7 +26,7 @@ ESLint uses recommended JavaScript, TypeScript, and React JSX runtime rules. Pre
 
 ## Testing Guidelines
 
-No automated test framework is configured. For behavior changes, add manual verification notes to the PR and validate relevant extension surfaces and browser targets when practical. At minimum, run `yarn fix` and a target build such as `yarn build:chrome`. For viewer changes, check tree view, raw view, search, URL fragments, and touched options persistence paths.
+The tests use Node.js's built-in test runner through `tsx`; no separate test framework is configured. For behavior changes, add manual verification notes to the PR and validate relevant extension surfaces and browser targets when practical. At minimum, run `yarn test`, `yarn tsc --noEmit`, `yarn eslint .`, and a target build such as `yarn build:chrome`. For viewer changes, check tree view, raw view, search, URL fragments, and touched options persistence paths.
 
 ## Commit & Pull Request Guidelines
 

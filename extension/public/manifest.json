@@ -11,6 +11,7 @@
   "content_scripts": [
     {
       "js": ["pages/content.js"],
+      "css": ["assets/loading.css"],
       "run_at": "document_start",
       "matches": ["<all_urls>"]
     }

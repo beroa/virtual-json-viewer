@@ -27,6 +27,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { FullHeightScrollbar } from "./FullHeightScrollbar";
 import { NodeId, RestoreSnapshotRequest, Tree, TreeHandler } from "./Tree";
 import { TreeContext } from "./TreeContext";
 import { TreeNavigator } from "./TreeNavigator";
@@ -381,6 +382,7 @@ export function TreeViewer({
           ))}
         </div>
       )}
+      <FullHeightScrollbar scrollElement={scrollElement} />
       <div className="min-h-0 flex-1">
         <Tree
           treeWalker={walker}

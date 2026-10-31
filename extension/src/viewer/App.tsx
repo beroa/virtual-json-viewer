@@ -62,11 +62,12 @@ const EMPTY_DIFF_RESULT: Diff.DiffResult = {
 
 export type AppProps = {
   jsonText: string;
+  onReady?: () => void;
 };
 
 type ViewerProps = TreeViewerProps & RawViewerProps;
 
-export function App({ jsonText }: AppProps): JSX.Element {
+export function App({ jsonText, onReady }: AppProps): JSX.Element {
   // Global settings
   const [theme] = useTheme();
   const [translation] = useLocalization();
@@ -79,6 +80,7 @@ export function App({ jsonText }: AppProps): JSX.Element {
       jsonText={jsonText}
       settings={settings}
       translation={translation}
+      onReady={onReady}
     />
   ) : (
     <div />
@@ -89,6 +91,7 @@ type LoadedAppProps = {
   jsonText: string;
   settings: Settings;
   translation: Translation;
+  onReady?: () => void;
 };
 
 type CompareLoadState = {
@@ -101,6 +104,7 @@ function LoadedApp({
   jsonText,
   settings,
   translation,
+  onReady,
 }: LoadedAppProps): JSX.Element {
   // Parse json
   const jsonResult = useMemo(
@@ -258,6 +262,10 @@ function LoadedApp({
     showParentKeys,
   };
   const viewerProps = useTransitionViewerProps(viewerPropsParams);
+
+  useEffect(() => {
+    if (jsonLines === null || viewerProps !== null) onReady?.();
+  }, [jsonLines, viewerProps, onReady]);
 
   // Browser default's "select all" behavior is not meaningful in the viewer,
   // children components should handle their own selection (except for standard input elements)

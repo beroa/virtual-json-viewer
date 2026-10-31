@@ -102,6 +102,8 @@ function notifyMatchToAncestors(
   let ancestor = matchedNode.parent;
   while (ancestor) {
     const match = searchMatches.get(ancestor.id)!;
+    // An earlier descendant match already marked the rest of this chain.
+    if (match.inDescendant) break;
     match.inDescendant = true;
     ancestor = ancestor.parent;
   }

@@ -58,16 +58,6 @@ export class TreeState {
     return this.visibleNodes.length;
   }
 
-  public *iter(): Generator<NodeState> {
-    for (const id of this.visibleNodes) {
-      yield this.nodeById(id);
-    }
-  }
-
-  public lengthAll(): number {
-    return this.nodes.length;
-  }
-
   public *iterAll(): Generator<NodeState> {
     yield* this.nodes.values();
   }

@@ -59,7 +59,7 @@ export function compareJsonLines(
     hasDiff: false,
   };
 
-  result.hasDiff = compareAtPaths(
+  compareAtPaths(
     asRoot(leftLines),
     asRoot(rightLines),
     ".",
@@ -465,43 +465,75 @@ function arrayAlignmentToken(value: Json.Root): string | null {
 }
 
 function findAnchors<T>(
-  left: T[],
-  right: T[],
-  equals: (left: T, right: T) => boolean,
-  complexity: number,
+  leftItems: T[],
+  rightItems: T[],
+  matches: (left: T, right: T) => boolean,
+  matrixCellCount: number,
 ): Array<[number, number]> {
-  if (!left.length || !right.length || complexity > LCS_MATRIX_LIMIT) {
+  if (
+    !leftItems.length ||
+    !rightItems.length ||
+    matrixCellCount > LCS_MATRIX_LIMIT
+  ) {
     return [];
   }
 
-  const dp = Array.from({ length: left.length + 1 }, () =>
-    Array<number>(right.length + 1).fill(0),
+  const lcsLengths = buildLcsLengths(leftItems, rightItems, matches);
+  return collectAnchors(leftItems, rightItems, matches, lcsLengths);
+}
+
+function buildLcsLengths<T>(
+  leftItems: T[],
+  rightItems: T[],
+  matches: (left: T, right: T) => boolean,
+): number[][] {
+  const lengths = Array.from({ length: leftItems.length + 1 }, () =>
+    Array<number>(rightItems.length + 1).fill(0),
   );
 
-  for (let leftIndex = left.length - 1; leftIndex >= 0; leftIndex--) {
-    for (let rightIndex = right.length - 1; rightIndex >= 0; rightIndex--) {
-      dp[leftIndex][rightIndex] = equals(left[leftIndex], right[rightIndex])
-        ? dp[leftIndex + 1][rightIndex + 1] + 1
+  for (let leftIndex = leftItems.length - 1; leftIndex >= 0; leftIndex--) {
+    for (
+      let rightIndex = rightItems.length - 1;
+      rightIndex >= 0;
+      rightIndex--
+    ) {
+      lengths[leftIndex][rightIndex] = matches(
+        leftItems[leftIndex],
+        rightItems[rightIndex],
+      )
+        ? lengths[leftIndex + 1][rightIndex + 1] + 1
         : Math.max(
-            dp[leftIndex + 1][rightIndex],
-            dp[leftIndex][rightIndex + 1],
+            lengths[leftIndex + 1][rightIndex],
+            lengths[leftIndex][rightIndex + 1],
           );
     }
   }
 
+  return lengths;
+}
+
+function collectAnchors<T>(
+  leftItems: T[],
+  rightItems: T[],
+  matches: (left: T, right: T) => boolean,
+  lcsLengths: number[][],
+): Array<[number, number]> {
   const anchors: Array<[number, number]> = [];
   let leftIndex = 0;
   let rightIndex = 0;
 
-  while (leftIndex < left.length && rightIndex < right.length) {
-    if (equals(left[leftIndex], right[rightIndex])) {
+  while (leftIndex < leftItems.length && rightIndex < rightItems.length) {
+    if (matches(leftItems[leftIndex], rightItems[rightIndex])) {
       anchors.push([leftIndex, rightIndex]);
       leftIndex++;
       rightIndex++;
       continue;
     }
 
-    if (dp[leftIndex + 1][rightIndex] >= dp[leftIndex][rightIndex + 1]) {
+    if (
+      lcsLengths[leftIndex + 1][rightIndex] >=
+      lcsLengths[leftIndex][rightIndex + 1]
+    ) {
       leftIndex++;
     } else {
       rightIndex++;

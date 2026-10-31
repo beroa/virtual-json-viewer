@@ -15,11 +15,16 @@ export function matchJsonSyntax(text: string): SyntaxMatch[] {
   // together so escaped quotes never end a string token.
   const tokens =
     /"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\b(?:true|false|null)\b/g;
+  const keySuffix = /\s*:/y;
   return Array.from(text.matchAll(tokens), (match) => {
     const start = match.index;
     const end = start + match[0].length;
     const isString = match[0].startsWith('"');
-    const isKey = isString && /^\s*:/.test(text.slice(end));
+    let isKey = false;
+    if (isString) {
+      keySuffix.lastIndex = end;
+      isKey = keySuffix.test(text);
+    }
     const value = isString && !isKey ? match[0].slice(1, -1) : "";
     return {
       id: `syntax-${start}`,

@@ -1,4 +1,3 @@
-import { RawDiffLine } from "@/viewer/commons/Diff";
 import * as DOM from "@/viewer/commons/Dom";
 import {
   ViewerEventType,
@@ -34,7 +33,6 @@ export type RawViewerProps = Props<{
   searchStartingIndex: number;
   isLargeJson: boolean;
   viewerId?: string;
-  displayLines?: RawDiffLine[];
   onScrollElementChange?: (element: Nullable<HTMLElement>) => void;
 }>;
 
@@ -45,7 +43,6 @@ export function RawViewer({
   setSearchNavigation,
   searchStartingIndex,
   viewerId = "main",
-  displayLines,
   onScrollElementChange,
   className,
 }: RawViewerProps): JSX.Element {
@@ -70,9 +67,6 @@ export function RawViewer({
     () => jsonLines.map((line) => Json.toString(line, { sortKeys, space })),
     [jsonLines, sortKeys, space],
   );
-  const renderedLines = displayLines ?? undefined;
-  const effectiveRawLines = renderedLines?.map((line) => line.text) ?? rawLines;
-
   // Navigation
   const navigator = useRef<SearchMatchNavigator>(new SearchMatchNavigator());
   navigator.current.observeNavigation(setSearchNavigation);
@@ -152,8 +146,7 @@ export function RawViewer({
       onKeyDown={handleSelectAll}
     >
       <RenderedLines
-        rawLines={renderedLines ? undefined : effectiveRawLines}
-        lines={renderedLines}
+        rawLines={rawLines}
         search={search}
         linkifyUrls={linkifyUrls}
         onSearchMatchesUpdate={setSearchMatches}
