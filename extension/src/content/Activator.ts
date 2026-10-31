@@ -1,5 +1,7 @@
 import { STORAGE } from "@/viewer/commons/Storage";
-import { Settings, SETTINGS_KEY } from "@/viewer/state";
+import type { Settings } from "@/viewer/state";
+
+const SETTINGS_KEY = "settings";
 
 const MIME_TYPE_JSON_SUFFIXES = [
   // Official: https://www.iana.org/assignments/media-types/media-types.xhtml

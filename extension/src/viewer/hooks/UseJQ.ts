@@ -26,6 +26,12 @@ export function useJQ(
         return;
       }
 
+      // Loading the jq WebAssembly runtime is unnecessary until a filter is
+      // applied. Keep the toolbar available, then initialize jq on demand.
+      if (!command.filter || jq !== null) {
+        return;
+      }
+
       try {
         const jqCurrent = await loadJQ();
         if (mutex.hasLock()) {
@@ -38,7 +44,7 @@ export function useJQ(
         }
       }
     },
-    [enableJQ],
+    [enableJQ, command.filter, jq],
   );
 
   // execute command and parse result
@@ -65,7 +71,7 @@ export function useJQ(
     [jq, jsonText, command, sortKeys],
   );
 
-  const jqEnabled = jq !== null;
+  const jqEnabled = enableJQ;
   return [jqEnabled, result];
 }
 

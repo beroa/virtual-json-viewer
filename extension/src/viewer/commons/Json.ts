@@ -125,9 +125,7 @@ export function tryParseLines(
 }
 
 function cleanJsonText(text: string): string {
-  text = removeXssiPrefix(text);
-  text = text.trim();
-  return text;
+  return removeXssiPrefix(text);
 }
 
 // Some servers include these prefixes in their JSON responses to protect from XSSI.

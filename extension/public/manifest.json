@@ -22,7 +22,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": ["assets/*", "pages/loader.js"],
       "matches": ["<all_urls>"]
     }
   ],

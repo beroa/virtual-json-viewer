@@ -12,7 +12,11 @@ const SRC = resolve(import.meta.dirname, "src");
 const PAGES = resolve(import.meta.dirname, "pages");
 const DIST = resolve(import.meta.dirname, "dist", BROWSER);
 
-function pageConfig(entrypoint: string, path: string): InlineConfig {
+function pageConfig(
+  entrypoint: string,
+  path: string,
+  cssAssetFileName?: string,
+): InlineConfig {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -34,7 +38,12 @@ function pageConfig(entrypoint: string, path: string): InlineConfig {
           // remove hash to have constant filenames
           entryFileNames: "pages/[name].js",
           chunkFileNames: "pages/[name].js",
-          assetFileNames: "assets/[name].[ext]",
+          assetFileNames: cssAssetFileName
+            ? (asset) =>
+                asset.name?.endsWith(".css")
+                  ? cssAssetFileName
+                  : "assets/[name].[ext]"
+            : "assets/[name].[ext]",
         },
       },
     },
@@ -71,6 +80,13 @@ async function buildExtension() {
   // clean dist dir before building
   await fs.rm(DIST, { recursive: true, force: true });
   await build(pageConfig("content", resolve(SRC, "content.ts")));
+  await build(
+    pageConfig(
+      "loader",
+      resolve(SRC, "content/Loader.tsx"),
+      "assets/content.css",
+    ),
+  );
   await build(pageConfig("background", resolve(SRC, "background.ts")));
   await build(pageConfig("options", resolve(PAGES, "options.html")));
   await patchManifest();
