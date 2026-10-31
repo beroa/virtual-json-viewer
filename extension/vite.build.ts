@@ -16,6 +16,7 @@ function pageConfig(
   entrypoint: string,
   path: string,
   cssAssetFileName?: string,
+  preserveEntrySignatures?: "strict",
 ): InlineConfig {
   return {
     plugins: [react(), tailwindcss()],
@@ -33,7 +34,12 @@ function pageConfig(
       emptyOutDir: false,
       rollupOptions: {
         input: { [entrypoint]: path },
+        ...(preserveEntrySignatures && { preserveEntrySignatures }),
         output: {
+          ...(preserveEntrySignatures && {
+            format: "es",
+            exports: "named",
+          }),
           dir: DIST,
           // remove hash to have constant filenames
           entryFileNames: "pages/[name].js",
@@ -85,6 +91,7 @@ async function buildExtension() {
       "loader",
       resolve(SRC, "content/Loader.tsx"),
       "assets/content.css",
+      "strict",
     ),
   );
   await build(pageConfig("background", resolve(SRC, "background.ts")));

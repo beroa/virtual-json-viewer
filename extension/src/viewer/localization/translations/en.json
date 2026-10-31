@@ -157,9 +157,8 @@
       "placeholder": "Compare against URL",
       "run": "Compare",
       "loading": "Loading...",
-      "clear": "Clear diff",
       "show": "Show compare",
-      "hide": "Hide compare"
+      "hide": "Close and clear compare"
     }
   },
   "diffIgnore": {

@@ -27,6 +27,7 @@ import { ViewerModeToggle } from "./ViewerModeToggle";
 export type CompareState = {
   url: string;
   isDiffMode: boolean;
+  isAccurate: boolean;
   isLoading: boolean;
   error: Nullable<string>;
   activeViewerId?: string;
@@ -137,10 +138,13 @@ export function Toolbar({
             }
             icon={isCompareControlsVisible ? Icon.Close : Icon.Files}
             onClick={() => {
-              if (!isCompareControlsVisible) {
+              if (isCompareControlsVisible) {
+                setCompareControlsVisible(false);
+                if (compareState.isDiffMode) onClearCompare?.();
+              } else {
                 setCompareUrlDraft(window.location.href);
+                setCompareControlsVisible(true);
               }
-              setCompareControlsVisible((visible) => !visible);
             }}
           />
         )}
@@ -153,7 +157,6 @@ export function Toolbar({
           compareUrl={compareUrlDraft}
           setCompareUrl={setCompareUrlDraft}
           onCompare={() => onCompare(compareUrlDraft)}
-          onClearCompare={onClearCompare!}
           showIgnoreLines={compareState.isDiffMode}
           ignorePatternText={ignorePatternText}
           setIgnorePatternText={setIgnorePatternText}
@@ -310,7 +313,6 @@ type CompareControlsProps = Props<{
   compareUrl: string;
   setCompareUrl: (url: string) => void;
   onCompare: () => void;
-  onClearCompare: () => void;
   showIgnoreLines: boolean;
   ignorePatternText: string;
   setIgnorePatternText: (text: string) => void;
@@ -321,7 +323,6 @@ function CompareControls({
   compareUrl,
   setCompareUrl,
   onCompare,
-  onClearCompare,
   showIgnoreLines,
   ignorePatternText,
   setIgnorePatternText,
@@ -330,6 +331,11 @@ function CompareControls({
   const t = useContext(TranslationContext);
   const onChange = (event: ChangeEvent<HTMLInputElement>) =>
     setCompareUrl(event.target.value);
+  const isAccurate =
+    compareState.isAccurate && compareState.url === compareUrl;
+  const submitCompare = () => {
+    if (compareUrl && !compareState.isLoading) onCompare();
+  };
 
   return (
     <div className={classNames("flex items-center gap-2", className)}>
@@ -339,11 +345,20 @@ function CompareControls({
         placeholder={t.toolbar.compare.placeholder}
         value={compareUrl}
         onChange={onChange}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          event.stopPropagation();
+          submitCompare();
+        }}
       />
 
       <button
-        className="bg-toolbar-focus text-toolbar-foreground rounded-sm px-2 py-1 enabled:hover:cursor-pointer disabled:opacity-50"
-        onClick={onCompare}
+        className={classNames(
+          "text-white rounded-sm px-2 py-1 enabled:hover:cursor-pointer disabled:opacity-50",
+          isAccurate ? "bg-emerald-700" : "bg-red-700",
+        )}
+        onClick={submitCompare}
         disabled={!compareUrl || compareState.isLoading}
       >
         {compareState.isLoading
@@ -356,15 +371,6 @@ function CompareControls({
           patternText={ignorePatternText}
           onApply={setIgnorePatternText}
         />
-      )}
-
-      {compareState.isDiffMode && (
-        <button
-          className="text-toolbar-foreground enabled:hover:border-toolbar-foreground/25 rounded-sm border border-transparent px-2 py-1 enabled:hover:cursor-pointer"
-          onClick={onClearCompare}
-        >
-          {t.toolbar.compare.clear}
-        </button>
       )}
 
       {compareState.error && (

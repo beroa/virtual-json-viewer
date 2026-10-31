@@ -139,6 +139,10 @@ function LoadedApp({
         return;
       }
 
+      // A compare URL from a shared fragment is only a draft until the user
+      // explicitly submits it.
+      if (compareRequestId === 0) return;
+
       setCompareLoadState((current) => ({
         status: "loading",
         jsonText: current.jsonText,
@@ -290,6 +294,7 @@ function LoadedApp({
     compareState: {
       url: state.compareUrl.value,
       isDiffMode: state.diffMode.value,
+      isAccurate: diffReady,
       isLoading: compareLoadState.status === "loading",
       error: compareError,
       activeViewerId: diffReady ? activePane : "main",

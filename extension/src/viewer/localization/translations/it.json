@@ -157,9 +157,8 @@
       "placeholder": "Confronta con URL",
       "run": "Confronta",
       "loading": "Caricamento...",
-      "clear": "Chiudi diff",
       "show": "Mostra confronto",
-      "hide": "Nascondi confronto"
+      "hide": "Chiudi e cancella confronto"
     }
   },
   "diffIgnore": {
