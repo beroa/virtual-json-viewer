@@ -17,5 +17,7 @@ export function TreeRow<Context>({
   TreeNode,
 }: RowComponentProps<TreeRowProps<Context>>): JSX.Element {
   const nodeState = treeState.nodeByIndex(index);
-  return <TreeNode style={style} node={nodeState} context={context} />;
+  return (
+    <TreeNode index={index} style={style} node={nodeState} context={context} />
+  );
 }

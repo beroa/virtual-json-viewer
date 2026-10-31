@@ -18,8 +18,6 @@ import { TreeRow, TreeRowProps } from "./TreeRow";
 import { TreeState } from "./TreeState";
 
 export type TreeProps<Context> = {
-  height: number;
-  width: number;
   treeWalker: TreeWalker;
   context: Context;
   children: TreeNodeComponent<Context>;
@@ -36,8 +34,6 @@ export type RestoreSnapshotRequest = {
 };
 
 export function Tree<Context>({
-  height,
-  width,
   treeWalker,
   context,
   children: TreeNode,
@@ -118,7 +114,7 @@ export function Tree<Context>({
     <List<TreeRowProps<Context>>
       tabIndex={-1}
       listRef={listRef}
-      style={{ height, width }}
+      style={{ height: "100%", width: "100%" }}
       rowComponent={TreeRow}
       rowCount={rowProps.treeState.length()}
       rowHeight={rowHeight}

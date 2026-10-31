@@ -11,7 +11,6 @@ import {
   KeydownBufferEvent,
   KeydownEvent,
   SetValue,
-  useElementSize,
   useEventBusListener,
   useGlobalKeydownEvent,
   useKeydownBuffer,
@@ -50,6 +49,8 @@ type ParentKey = {
   key: Json.Key;
   nesting: number;
   nodeId: NodeId;
+  progress: number;
+  height: number;
 };
 
 export function TreeViewer({
@@ -83,34 +84,24 @@ export function TreeViewer({
   // It changes when the content is (re)loaded.
   const [tree, treeRef] = useReactiveRef<TreeHandler>();
   const [parentKeys, setParentKeys] = useState<ParentKey[]>([]);
-  const [scrollbarWidth, setScrollbarWidth] = useState(0);
-  const scrollbarObserver = useRef<Nullable<ResizeObserver>>(null);
+  const parentRowHeights = useRef(new Map<NodeId, number>());
+  const [scrollElement, setScrollElementState] =
+    useState<Nullable<HTMLElement>>(null);
 
   const setScrollElement = useCallback(
     (element: Nullable<HTMLElement>) => {
       onScrollElementChange?.(element);
-      scrollbarObserver.current?.disconnect();
-      scrollbarObserver.current = null;
-
-      if (!element) {
-        setScrollbarWidth(0);
-        return;
-      }
-
-      const updateScrollbarWidth = () =>
-        setScrollbarWidth(element.offsetWidth - element.clientWidth);
-      updateScrollbarWidth();
-
-      scrollbarObserver.current = new ResizeObserver(updateScrollbarWidth);
-      scrollbarObserver.current.observe(element);
+      setScrollElementState(element);
     },
     [onScrollElementChange],
   );
 
-  // Track tree element size
+  // Parent viewer element for focus and navigation
   const [parent, parentRef] = useReactiveRef<HTMLDivElement>();
-  const [treeContainer, treeContainerRef] = useReactiveRef<HTMLDivElement>();
-  const { height, width } = useElementSize(treeContainer);
+
+  useEffect(() => {
+    parentRowHeights.current.clear();
+  }, [tree]);
 
   // Global events
   const expand = useCallback(() => tree?.openAll(), [tree]);
@@ -133,17 +124,54 @@ export function TreeViewer({
 
   // Tree Navigator
   const updateParentKeys = useCallback(
-    (id: NodeId) => {
-      const node = tree?.get(id);
+    (fallbackIndex?: number) => {
+      if (!tree || !scrollElement || !showParentKeys) {
+        setParentKeys((current) => (current.length ? [] : current));
+        return;
+      }
+
+      const viewport = scrollElement.getBoundingClientRect();
+      const lineHeight =
+        parseFloat(getComputedStyle(scrollElement).lineHeight) || 24;
+      const rows = new Map<number, HTMLElement>();
+      let firstVisibleIndex: number | undefined;
+      for (const row of scrollElement.querySelectorAll<HTMLElement>(
+        "[data-tree-index]",
+      )) {
+        const index = Number(row.dataset.treeIndex);
+        rows.set(index, row);
+        const rect = row.getBoundingClientRect();
+        if (
+          firstVisibleIndex === undefined &&
+          rect.bottom > viewport.top &&
+          rect.top < viewport.bottom
+        ) {
+          firstVisibleIndex = index;
+        }
+      }
+
+      const index = firstVisibleIndex ?? fallbackIndex;
+      if (index === undefined || index < 0 || index >= tree.length()) return;
+      const node = tree.getByIndex(index);
       const keys: ParentKey[] = [];
-      let ancestor = node?.parent;
+      let ancestor: typeof node | null = node;
       while (ancestor) {
-        if (ancestor.key !== null) {
-          keys.unshift({
-            key: ancestor.key,
-            nesting: ancestor.nesting,
-            nodeId: ancestor.id,
-          });
+        if (ancestor.key !== null && ancestor.isOpen) {
+          const row = rows.get(tree.indexById(ancestor.id));
+          const rect = row?.getBoundingClientRect();
+          if (rect) parentRowHeights.current.set(ancestor.id, rect.height);
+          const progress = rect
+            ? Math.max(0, Math.min(1, (viewport.top - rect.top) / rect.height))
+            : 1;
+          if (progress > 0) {
+            keys.unshift({
+              key: ancestor.key,
+              nesting: ancestor.nesting,
+              nodeId: ancestor.id,
+              progress,
+              height: parentRowHeights.current.get(ancestor.id) ?? lineHeight,
+            });
+          }
         }
         ancestor = ancestor.parent;
       }
@@ -153,22 +181,31 @@ export function TreeViewer({
           (key, index) =>
             key.key === keys[index].key &&
             key.nesting === keys[index].nesting &&
-            key.nodeId === keys[index].nodeId,
+            key.nodeId === keys[index].nodeId &&
+            key.progress === keys[index].progress &&
+            key.height === keys[index].height,
         )
           ? current
           : keys,
       );
     },
-    [tree],
+    [tree, scrollElement, showParentKeys],
   );
 
   const updateParentKeysForVisibleRow = useCallback(
-    (index: number) => {
-      const node = tree?.getByIndex(index);
-      if (node) updateParentKeys(node.id);
-    },
-    [tree, updateParentKeys],
+    (index: number) => updateParentKeys(index),
+    [updateParentKeys],
   );
+
+  useEffect(() => {
+    if (!scrollElement) return;
+    const onScroll = () => updateParentKeys();
+    scrollElement.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      scrollElement.removeEventListener("scroll", onScroll);
+    };
+  }, [scrollElement, updateParentKeys]);
 
   const treeNavigator = useMemo(
     () => new TreeNavigator(tree, parent),
@@ -303,6 +340,11 @@ export function TreeViewer({
     [treeNavigator, enableEnterNode, viewerId, diffByPath],
   );
 
+  const pinnedHeight = parentKeys.reduce(
+    (height, key) => height + key.height * key.progress,
+    0,
+  );
+
   // Wrap the Tree in a div to handle resize, focus and navigation
   return (
     <div
@@ -316,26 +358,31 @@ export function TreeViewer({
     >
       {showParentKeys && parentKeys.length > 0 && (
         <div
-          className="bg-viewer-background text-json-key border-toolbar-foreground/20 absolute top-0 left-0 z-10 border-b py-1 shadow-sm"
-          style={{ right: scrollbarWidth }}
+          className="bg-viewer-background text-json-key z-10 shrink-0 overflow-hidden shadow-sm"
+          style={{ height: pinnedHeight }}
         >
-          {parentKeys.map(({ key, nesting, nodeId }, index) => (
-            <button
-              key={index}
-              type="button"
-              className="block w-full text-left whitespace-pre-wrap hover:underline"
-              style={{ paddingLeft: `calc(${nesting}em + 1.375rem)` }}
-              onClick={() => tree?.scrollTo(nodeId, "start")}
+          {parentKeys.map(({ key, nesting, nodeId, progress, height }) => (
+            <div
+              key={nodeId}
+              className="overflow-hidden"
+              style={{ height: height * progress }}
             >
-              {key}:
-            </button>
+              <button
+                type="button"
+                className="block w-full text-left whitespace-pre-wrap hover:underline"
+                style={{
+                  paddingLeft: `calc(${nesting}em + 1.375rem)`,
+                }}
+                onClick={() => tree?.scrollTo(nodeId, "start")}
+              >
+                {key}:
+              </button>
+            </div>
           ))}
         </div>
       )}
-      <div ref={treeContainerRef} className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1">
         <Tree
-          height={height}
-          width={width}
           treeWalker={walker}
           ref={treeRef}
           context={context}

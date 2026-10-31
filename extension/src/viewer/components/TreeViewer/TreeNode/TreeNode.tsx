@@ -20,6 +20,7 @@ import { Value, ValueHandle } from "./Value";
 
 export function TreeNode({
   context: { tree, enableEnterNode, diffByPath },
+  index,
   node,
   style,
 }: TreeNodeProps<TreeContext>): JSX.Element {
@@ -80,6 +81,7 @@ export function TreeNode({
   return (
     <div
       ref={parentRef}
+      data-tree-index={index}
       className={classNames(
         "hover:bg-viewer-focus",
         { "bg-viewer-focus": isAnchored },
