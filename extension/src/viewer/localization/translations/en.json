@@ -151,6 +151,7 @@
         "off": "Slurp: Off"
       },
       "run": "Run command",
+      "unavailable": "JQ could not be loaded on this page.",
       "genericError": "JQ command failed"
     },
     "compare": {

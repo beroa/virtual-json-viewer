@@ -39,6 +39,7 @@ export type ToolbarProps = Props<{
   searchState: StateObject<Search>;
   searchNavigation: SearchNavigation;
   jqCommandState?: StateObject<JQCommand>;
+  jqUnavailable?: boolean;
   compareState?: CompareState;
   compareControlsVisible?: boolean;
   setCompareControlsVisible?: Dispatch<SetStateAction<boolean>>;
@@ -56,6 +57,7 @@ export function Toolbar({
   searchState,
   searchNavigation,
   jqCommandState,
+  jqUnavailable = false,
   compareState,
   compareControlsVisible,
   setCompareControlsVisible,
@@ -76,6 +78,7 @@ export function Toolbar({
   }, [compareState?.url]);
 
   const isTreeView = viewerModeState.value === ViewerMode.Tree;
+  const isDiffMode = compareState?.isDiffMode ?? false;
   const compareEnabled = !!compareState && !!onCompare;
   const isCompareControlsVisible = compareControlsVisible ?? false;
 
@@ -87,39 +90,44 @@ export function Toolbar({
       )}
     >
       <div className="flex items-center">
-        <ViewerModeToggle
-          className="ml-1 h-7 w-14"
-          viewerMode={viewerModeState.value}
-          setViewerMode={viewerModeState.setValue}
-        />
+        {!isDiffMode && (
+          <>
+            <ViewerModeToggle
+              className="ml-1 h-7 w-14"
+              viewerMode={viewerModeState.value}
+              setViewerMode={viewerModeState.setValue}
+            />
 
-        <Separator />
+            <Separator />
 
-        <OpenStateToggle className="h-7 w-14 px-px" />
+            <OpenStateToggle className="h-7 w-14 px-px" />
 
-        <Separator />
+            {isTreeView && <Separator />}
 
-        <IconButton
-          className={classNames("fill-toolbar-foreground h-6 w-6", {
-            "hover:bg-toolbar-focus": isTreeView && !showParentKeys,
-            "bg-toolbar-focus": isTreeView && showParentKeys,
-          })}
-          title={t.toolbar.parents.show}
-          icon={Icon.ListTree}
-          onClick={() => setShowParentKeys((show) => !show)}
-          disabled={!isTreeView}
-        />
+            {isTreeView && (
+              <IconButton
+                className={classNames("fill-toolbar-foreground h-6 w-6", {
+                  "hover:bg-toolbar-focus": !showParentKeys,
+                  "bg-toolbar-focus": showParentKeys,
+                })}
+                title={t.toolbar.parents.show}
+                icon={Icon.ListTree}
+                onClick={() => setShowParentKeys((show) => !show)}
+              />
+            )}
 
-        <Separator />
+            {isTreeView && <Separator />}
 
-        <SaveButton className="h-6 w-6 px-px" jsonLines={jsonLines} />
+            <SaveButton className="h-6 w-6 px-px" jsonLines={jsonLines} />
+          </>
+        )}
 
         <SearchBox
-          className="ml-2 flex-1"
+          className={classNames("flex-1", { "ml-2": !isDiffMode })}
           search={searchState.value}
           setSearch={searchState.setValue}
           navigation={searchNavigation}
-          enableVisibility={isTreeView}
+          enableVisibility={isTreeView && !isDiffMode}
           viewerId={compareState?.activeViewerId}
         />
 
@@ -169,6 +177,7 @@ export function Toolbar({
             command={jqCommandState.value}
             setCommand={jqCommandState.setValue}
             isMultilineOutput={jsonLines.length > 1}
+            unavailable={jqUnavailable}
           />
         </div>
       )}
@@ -331,8 +340,7 @@ function CompareControls({
   const t = useContext(TranslationContext);
   const onChange = (event: ChangeEvent<HTMLInputElement>) =>
     setCompareUrl(event.target.value);
-  const isAccurate =
-    compareState.isAccurate && compareState.url === compareUrl;
+  const isAccurate = compareState.isAccurate && compareState.url === compareUrl;
   const submitCompare = () => {
     if (compareUrl && !compareState.isLoading) onCompare();
   };
@@ -355,7 +363,7 @@ function CompareControls({
 
       <button
         className={classNames(
-          "text-white rounded-sm px-2 py-1 enabled:hover:cursor-pointer disabled:opacity-50",
+          "rounded-sm px-2 py-1 text-white enabled:hover:cursor-pointer disabled:opacity-50",
           isAccurate ? "bg-emerald-700" : "bg-red-700",
         )}
         onClick={submitCompare}

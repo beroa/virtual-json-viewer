@@ -30,12 +30,14 @@ export type JQCommandBoxProps = Props<{
   command: JQCommand;
   setCommand: Dispatch<SetStateAction<JQCommand>>;
   isMultilineOutput: boolean;
+  unavailable?: boolean;
 }>;
 
 export function JQCommandBox({
   command,
   setCommand,
   isMultilineOutput,
+  unavailable = false,
 }: JQCommandBoxProps): JSX.Element {
   const t = useContext(TranslationContext);
   const [filter, setFilter] = useState(command.filter);
@@ -82,6 +84,7 @@ export function JQCommandBox({
             title={t.toolbar.jq.clear}
             icon={Icon.Close}
             onClick={clearFilter}
+            disabled={unavailable}
           />
         )}
 
@@ -90,6 +93,7 @@ export function JQCommandBox({
           filter={filter}
           setFilter={setFilter}
           onSubmit={applyFilter}
+          disabled={unavailable}
         />
 
         {command.slurp !== null && (
@@ -98,6 +102,7 @@ export function JQCommandBox({
             title={t.toolbar.jq.slurp[command.slurp ? "on" : "off"]}
             icon={command.slurp ? Icon.SymbolFile : Icon.Files}
             onClick={() => setCommand(updateField("slurp", !command.slurp))}
+            disabled={unavailable}
           />
         )}
 
@@ -106,9 +111,15 @@ export function JQCommandBox({
           title={t.toolbar.jq.run}
           icon={Icon.Run}
           onClick={applyFilter}
+          disabled={unavailable}
           tabIndex={-1}
         />
       </span>
+      {unavailable && (
+        <span role="status" className="ml-2 text-xs text-red-300">
+          {t.toolbar.jq.unavailable}
+        </span>
+      )}
     </span>
   );
 }
@@ -117,12 +128,14 @@ type FilterInputProps = Props<{
   filter: string;
   setFilter: (text: string) => void;
   onSubmit: () => void;
+  disabled?: boolean;
 }>;
 
 function FilterInput({
   filter,
   setFilter,
   onSubmit,
+  disabled = false,
   className,
 }: FilterInputProps): JSX.Element {
   const [current, ref] = useReactiveRef<HTMLInputElement>();
@@ -159,6 +172,7 @@ function FilterInput({
       onChange={onChange}
       onKeyDown={onKeyDown}
       placeholder="."
+      disabled={disabled}
     />
   );
 }

@@ -116,7 +116,7 @@ function LoadedApp({
   const jqCommand = state.diffMode.value
     ? EmptyJQCommand
     : state.jqCommand.value;
-  const [jqEnabled, jqResult] = useJQ(jsonText, jqCommand);
+  const [jqEnabled, jqResult, jqUnavailable] = useJQ(jsonText, jqCommand);
   const [jsonLines, error] = resolveJson(jsonResult, jqResult);
 
   const [compareRequestId, setCompareRequestId] = useState(0);
@@ -291,6 +291,7 @@ function LoadedApp({
       : state.searchNavigation.value,
     jqCommandState:
       !state.diffMode.value && jqEnabled ? state.jqCommand : undefined,
+    jqUnavailable: !state.diffMode.value && jqUnavailable,
     compareState: {
       url: state.compareUrl.value,
       isDiffMode: state.diffMode.value,

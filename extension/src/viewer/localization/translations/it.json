@@ -151,6 +151,7 @@
         "off": "Slurp: Off"
       },
       "run": "Esegui il comando",
+      "unavailable": "Impossibile caricare JQ in questa pagina.",
       "genericError": "Comando JQ fallito"
     },
     "compare": {
