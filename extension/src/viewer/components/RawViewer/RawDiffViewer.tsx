@@ -175,19 +175,20 @@ export function RawDiffViewer({
   leftNavigator.current.observeNavigation(setLeftSearchNavigation);
   rightNavigator.current.observeNavigation(setRightSearchNavigation);
 
+  // The starting index restores new matches; navigation must not reset either pane.
   useEffect(() => {
     leftNavigator.current.reset(
       leftMatches.getFlattenedHandlers(),
       searchStartingIndex,
     );
-  }, [leftMatches, searchStartingIndex]);
+  }, [leftMatches]);
 
   useEffect(() => {
     rightNavigator.current.reset(
       rightMatches.getFlattenedHandlers(),
       searchStartingIndex,
     );
-  }, [rightMatches, searchStartingIndex]);
+  }, [rightMatches]);
 
   const goToPreviousMatch = useCallback((event: Event) => {
     if (shouldHandleViewerEvent(event, "left")) {

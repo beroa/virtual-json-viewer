@@ -47,11 +47,19 @@ export function SearchInput({
 
   const [current, ref] = useReactiveRef<HTMLInputElement>();
 
-  // restore the input element internal state on rerender
-  if (current) current.value = text;
-
   // debounce onChange event to wait until user stops typing
   const timeoutId = useRef<Nullable<NodeJS.Timeout>>(null);
+  const previousText = useRef(text);
+
+  // Do not overwrite edits that have not yet reached the debounced search state.
+  useEffect(() => {
+    if (!text && previousText.current && timeoutId.current) {
+      clearTimeout(timeoutId.current);
+      timeoutId.current = null;
+    }
+    previousText.current = text;
+    if (current && !timeoutId.current) current.value = text;
+  }, [current, text]);
 
   const maybeClearTimeout = () => {
     if (timeoutId.current) clearTimeout(timeoutId.current);
@@ -65,7 +73,10 @@ export function SearchInput({
   const onChange = (e: FormEvent<HTMLInputElement>) => {
     maybeClearTimeout();
     const text = (e.target as HTMLInputElement).value;
-    timeoutId.current = setTimeout(() => setText(text), searchDelay);
+    timeoutId.current = setTimeout(() => {
+      timeoutId.current = null;
+      setText(text);
+    }, searchDelay);
   };
 
   function flushText(): [text: string, changed: boolean] {
