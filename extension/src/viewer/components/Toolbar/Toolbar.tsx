@@ -35,6 +35,8 @@ export type CompareState = {
 
 export type ToolbarProps = Props<{
   jsonLines: Json.Lines;
+  sortKeys: boolean;
+  setSortKeys: (sortKeys: boolean) => void;
   viewerModeState: StateObject<ViewerMode>;
   searchState: StateObject<Search>;
   searchNavigation: SearchNavigation;
@@ -53,6 +55,8 @@ export type ToolbarProps = Props<{
 
 export function Toolbar({
   jsonLines,
+  sortKeys,
+  setSortKeys,
   viewerModeState,
   searchState,
   searchNavigation,
@@ -122,8 +126,22 @@ export function Toolbar({
           </>
         )}
 
+        <button
+          type="button"
+          className={classNames(
+            "fill-toolbar-foreground hover:bg-toolbar-focus ml-2 h-6 w-6 rounded-sm enabled:hover:cursor-pointer",
+            { "bg-toolbar-focus": sortKeys },
+          )}
+          title={t.settings.labels.sortKeys.text}
+          aria-label={t.settings.labels.sortKeys.text}
+          aria-pressed={sortKeys}
+          onClick={() => setSortKeys(!sortKeys)}
+        >
+          <Icon.SortKeys />
+        </button>
+
         <SearchBox
-          className={classNames("flex-1", { "ml-2": !isDiffMode })}
+          className="ml-2 flex-1"
           search={searchState.value}
           setSearch={searchState.setValue}
           navigation={searchNavigation}

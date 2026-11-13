@@ -40,6 +40,7 @@ import {
 } from "./localization";
 import {
   ApplicationState,
+  DispatchSettings,
   EmptyJQCommand,
   EmptySearchNavigation,
   SearchNavigation,
@@ -71,7 +72,7 @@ export function App({ jsonText, onReady }: AppProps): JSX.Element {
   // Global settings
   const [theme] = useTheme();
   const [translation] = useLocalization();
-  const [settings] = useSettings();
+  const [settings, updateSettings] = useSettings();
 
   const isLoaded = theme != null && translation != null && settings != null;
 
@@ -79,6 +80,7 @@ export function App({ jsonText, onReady }: AppProps): JSX.Element {
     <LoadedApp
       jsonText={jsonText}
       settings={settings}
+      updateSettings={updateSettings}
       translation={translation}
       onReady={onReady}
     />
@@ -90,6 +92,7 @@ export function App({ jsonText, onReady }: AppProps): JSX.Element {
 type LoadedAppProps = {
   jsonText: string;
   settings: Settings;
+  updateSettings: DispatchSettings;
   translation: Translation;
   onReady?: () => void;
 };
@@ -103,6 +106,7 @@ type CompareLoadState = {
 function LoadedApp({
   jsonText,
   settings,
+  updateSettings,
   translation,
   onReady,
 }: LoadedAppProps): JSX.Element {
@@ -120,7 +124,11 @@ function LoadedApp({
   const jqCommand = state.diffMode.value
     ? EmptyJQCommand
     : state.jqCommand.value;
-  const [jqEnabled, jqResult, jqUnavailable] = useJQ(jsonText, jqCommand);
+  const [jqEnabled, jqResult, jqUnavailable] = useJQ(
+    jsonText,
+    jqCommand,
+    settings,
+  );
   const [jsonLines, error] = resolveJson(jsonResult, jqResult);
 
   const [compareRequestId, setCompareRequestId] = useState(0);
@@ -290,6 +298,8 @@ function LoadedApp({
 
   const toolbarProps = {
     jsonLines,
+    sortKeys: settings.sortKeys,
+    setSortKeys: (sortKeys: boolean) => updateSettings({ sortKeys }),
     viewerModeState: state.viewerMode,
     searchState: state.search,
     searchNavigation: diffReady

@@ -9,6 +9,14 @@ export interface Icon {
   (): JSX.Element;
 }
 
+export function SortKeys(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 2h7v1H2zm0 3h6v1H2zm0 3h5v1H2zm0 3h4v1H2zM11 2h1v9.1l2-2 .7.7-3.2 3.2-3.2-3.2.7-.7 2 2z" />
+    </svg>
+  );
+}
+
 export function ArrowRight(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">

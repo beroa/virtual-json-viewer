@@ -1,7 +1,7 @@
 import newJQ, { JQ } from "@/vendor/jq.wasm";
 import * as Json from "@/viewer/commons/Json";
 import { getURL } from "@/viewer/commons/Runtime";
-import { DefaultSettings, JQCommand, useSettings } from "@/viewer/state";
+import { JQCommand, Settings } from "@/viewer/state";
 import { useState } from "react";
 import { Mutex, useEffectAsync, useReactiveRef } from ".";
 
@@ -11,10 +11,9 @@ export type JQResult = Json.Lines | Error | undefined;
 export function useJQ(
   jsonText: string,
   command: JQCommand,
+  settings: Settings,
 ): [JQEnabled, JQResult, boolean] {
-  // it's called outside settings context
-  const [settings] = useSettings();
-  const { enableJQ, sortKeys } = settings ?? DefaultSettings;
+  const { enableJQ, sortKeys } = settings;
 
   // check if wasm is enabled on first load
   const [jq, setJQ] = useReactiveRef<JQ>();
