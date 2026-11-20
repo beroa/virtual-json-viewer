@@ -9,6 +9,26 @@ export interface Icon {
   (): JSX.Element;
 }
 
+export function Regex(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="3" cy="12" r="1.5" />
+      <path d="M10 2h1v4.5l3.2-2.4.6.8-3.3 2.3 3.8 1.3-.3.9-3.8-1.3 1.4 4.2-1 .3-1.1-3.9-1.4 3.9-1-.3 1.5-4.2-3.9 1.3-.3-.9 3.8-1.3-3.3-2.3.6-.8L10 6.5z" />
+    </svg>
+  );
+}
+
+export function WholeWord(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <text x="1" y="10" fontSize="10" fontFamily="sans-serif">
+        ab
+      </text>
+      <path d="M1 12h14v1H1zM1 10h1v3H1zm13 0h1v3h-1z" />
+    </svg>
+  );
+}
+
 export function SortKeys(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">

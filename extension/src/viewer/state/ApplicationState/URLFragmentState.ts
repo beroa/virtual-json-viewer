@@ -17,6 +17,8 @@ export type URLFragmentState = {
   searchText?: Search["text"];
   searchVisibility?: Search["visibility"];
   searchCaseSensitive?: Search["caseSensitive"];
+  searchWholeWord?: Search["wholeWord"];
+  searchRegex?: Search["regex"];
   searchStartingIndex?: number;
   jqFilter?: JQCommand["filter"];
   jqSlurp?: JQCommand["slurp"];
@@ -104,6 +106,8 @@ const URL_KEYS: Record<keyof URLFragmentState, string> = {
   searchText: "s",
   searchVisibility: "sv",
   searchCaseSensitive: "sc",
+  searchWholeWord: "sw",
+  searchRegex: "sr",
   searchStartingIndex: "si",
   jqFilter: "jq",
   jqSlurp: "jqs",
@@ -139,6 +143,8 @@ const FIELD_SERIALIZERS: URLFragmentStateFieldsSerializer = {
   searchText: StringSerializer,
   searchVisibility: new EnumSerializer(SearchVisibility),
   searchCaseSensitive: BooleanSerializer,
+  searchWholeWord: BooleanSerializer,
+  searchRegex: BooleanSerializer,
   searchStartingIndex: NumberSerializer,
   jqFilter: StringSerializer,
   jqSlurp: new NullableSerializer(BooleanSerializer),

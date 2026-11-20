@@ -495,7 +495,13 @@ function findMatches(
 ): MatchesResult {
   const text = line.text;
   const searchMatches = search.text
-    ? matchSearch(text, search.text, search.caseSensitive)
+    ? matchSearch(
+        text,
+        search.text,
+        search.caseSensitive,
+        search.wholeWord,
+        search.regex,
+      )
     : [];
 
   return {

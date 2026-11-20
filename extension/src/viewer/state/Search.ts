@@ -2,6 +2,8 @@ export type Search = {
   text: string;
   visibility: SearchVisibility;
   caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
 };
 
 export enum SearchVisibility {
@@ -14,6 +16,8 @@ export const EmptySearch: Search = {
   text: "",
   visibility: SearchVisibility.All,
   caseSensitive: false,
+  wholeWord: false,
+  regex: false,
 };
 
 // Navigation

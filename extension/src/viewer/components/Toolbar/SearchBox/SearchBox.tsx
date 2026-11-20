@@ -1,10 +1,14 @@
 import { dispatch, ViewerEventType } from "@/viewer/commons/EventBus";
+import { isValidSearchRegex } from "@/viewer/commons/Searcher";
+import { Icon } from "@/viewer/components";
+import { TranslationContext } from "@/viewer/localization";
 import { Search, SearchNavigation } from "@/viewer/state";
 import classNames from "classnames";
 import {
   Dispatch,
   JSX,
   SetStateAction,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -31,6 +35,8 @@ export function SearchBox({
   enableVisibility,
   viewerId,
 }: SearchBoxProps): JSX.Element {
+  const t = useContext(TranslationContext);
+  const invalidRegex = !!search.regex && !isValidSearchRegex(search.text);
   const isCommittedRef = useRef(false);
   const [isCommitted, setIsCommitted] = useState(false);
 
@@ -99,7 +105,19 @@ export function SearchBox({
         setText={setSearchText}
         clearPreview={clearPreview}
         commitSearch={commitSearch}
+        toggleWholeWord={() => updateSearch({ wholeWord: !search.wholeWord })}
+        toggleRegex={() => updateSearch({ regex: !search.regex })}
+        invalidRegex={invalidRegex}
       />
+      {invalidRegex && (
+        <span
+          className="text-red-500"
+          role="alert"
+          title={t.toolbar.search.invalidRegex}
+        >
+          !<span className="sr-only">{t.toolbar.search.invalidRegex}</span>
+        </span>
+      )}
 
       {search.text && (
         <SearchNavigationPanel
@@ -125,6 +143,32 @@ export function SearchBox({
         caseSensitive={search.caseSensitive}
         setCaseSensitive={(caseSensitive) => updateSearch({ caseSensitive })}
       />
+      <button
+        type="button"
+        className={classNames(
+          "fill-input-foreground hover:bg-input-focus ml-1 h-6 w-6 rounded-sm enabled:hover:cursor-pointer",
+          { "bg-input-focus": search.wholeWord },
+        )}
+        title={t.toolbar.search.wholeWord}
+        aria-label={t.toolbar.search.wholeWord}
+        aria-pressed={!!search.wholeWord}
+        onClick={() => updateSearch({ wholeWord: !search.wholeWord })}
+      >
+        <Icon.WholeWord />
+      </button>
+      <button
+        type="button"
+        className={classNames(
+          "fill-input-foreground hover:bg-input-focus ml-1 h-6 w-6 rounded-sm enabled:hover:cursor-pointer",
+          { "bg-input-focus": search.regex },
+        )}
+        title={t.toolbar.search.regex}
+        aria-label={t.toolbar.search.regex}
+        aria-pressed={!!search.regex}
+        onClick={() => updateSearch({ regex: !search.regex })}
+      >
+        <Icon.Regex />
+      </button>
     </span>
   );
 }

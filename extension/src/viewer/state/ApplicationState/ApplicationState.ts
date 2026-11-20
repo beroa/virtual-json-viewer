@@ -60,6 +60,8 @@ export function useApplicationState(
     text: urlState.searchText ?? EmptySearch.text,
     visibility: urlState.searchVisibility ?? settings.searchVisibility,
     caseSensitive: urlState.searchCaseSensitive ?? EmptySearch.caseSensitive,
+    wholeWord: urlState.searchWholeWord ?? EmptySearch.wholeWord,
+    regex: urlState.searchRegex ?? EmptySearch.regex,
   };
   const [search, setSearch] = useSessionStorage("search", startingSearch);
 
@@ -88,7 +90,7 @@ export function useApplicationState(
 
   // Reset to 0 when parameters affecting search results change.
   // It's done without useEffect to make sure it's applied synchronously to the changes.
-  const searchParams = `${jq.filter}|${jq.slurp}|${search.text}|${search.caseSensitive}`;
+  const searchParams = `${jq.filter}|${jq.slurp}|${search.text}|${search.caseSensitive}|${!!search.wholeWord}|${!!search.regex}`;
   const oldSearchParams = useDeferredValue<string>(searchParams);
   if (searchParams !== oldSearchParams && searchStartingIndex !== 0) {
     syncSearchStartingIndex = 0;
@@ -143,6 +145,8 @@ function urlFragmentFromState(state: ApplicationState): URLFragmentState {
     urlFragmentState.searchText = state.search.value.text;
     urlFragmentState.searchVisibility = state.search.value.visibility;
     urlFragmentState.searchCaseSensitive = state.search.value.caseSensitive;
+    if (state.search.value.wholeWord) urlFragmentState.searchWholeWord = true;
+    if (state.search.value.regex) urlFragmentState.searchRegex = true;
     urlFragmentState.searchStartingIndex = state.searchStartingIndex;
   }
 

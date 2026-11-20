@@ -46,7 +46,13 @@ export function SearchedText({
   const background = selected ? "bg-orange-400" : "bg-yellow-300";
 
   return (
-    <mark ref={markRef} className={classNames(background, "text-black")}>
+    <mark
+      ref={markRef}
+      className={classNames(background, "text-black", {
+        "inline-block h-[1em] w-0.5 align-text-bottom":
+          Array.isArray(children) && children.length === 0,
+      })}
+    >
       {children}
     </mark>
   );
@@ -58,8 +64,10 @@ export function matchSearch(
   text: string,
   searchText: string,
   caseSensitive?: boolean,
+  wholeWord?: boolean,
+  regex?: boolean,
 ): SearchMatch[] {
-  const searcher = buildSearcher(searchText, caseSensitive);
+  const searcher = buildSearcher(searchText, caseSensitive, wholeWord, regex);
   return searcher.findMatches(text).map(searchMatchFromSearcher);
 }
 

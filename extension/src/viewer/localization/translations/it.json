@@ -128,6 +128,9 @@
     "save": "Salva",
     "search": {
       "clear": "Cancella",
+      "wholeWord": "Parola intera (Alt+W)",
+      "regex": "Usa espressione regolare (Alt+R)",
+      "invalidRegex": "Espressione regolare non valida",
       "case": {
         "insensitive": "Ignora maiuscolo",
         "sensitive": "Considera maiuscolo"

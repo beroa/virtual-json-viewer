@@ -31,10 +31,14 @@ export function renderMatches(
   }
 
   // split matches in starting/ending edges
-  const edges: Edge[] = allMatches.flatMap((match) => [
-    { id: match.id, index: match.start, direction: START, match: match },
-    { id: match.id, index: match.end, direction: END, match: match },
-  ]);
+  const edges: Edge[] = allMatches.flatMap<Edge>((match) =>
+    match.start === match.end
+      ? [{ id: match.id, index: match.start, direction: ZERO, match }]
+      : [
+          { id: match.id, index: match.start, direction: START, match },
+          { id: match.id, index: match.end, direction: END, match },
+        ],
+  );
 
   // sort to process them in order
   edges.sort(compareEdges);
@@ -61,6 +65,11 @@ export function renderMatches(
     if (index > lastIndex) {
       nodes.push(text.substring(lastIndex, index));
       lastIndex = index;
+    }
+
+    if (direction === ZERO) {
+      nodes.push(nodeBuilder.fromMatch(match, []));
+      continue;
     }
 
     // if it's a starting edge: simply add a new level to the stack
@@ -120,11 +129,12 @@ export function renderMatches(
 // numerical value is used for comparison
 const START = 0;
 const END = 1;
+const ZERO = 2;
 
 type Edge = {
   id: string;
   index: number;
-  direction: typeof START | typeof END;
+  direction: typeof START | typeof END | typeof ZERO;
   match: AnyMatch;
 };
 
@@ -145,7 +155,8 @@ function compareEdges(a: Edge, b: Edge): number {
 
   // end before start: close all opened tags before opening a new one
   if (a.direction !== b.direction) {
-    return b.direction - a.direction;
+    const priority = { [END]: 0, [ZERO]: 1, [START]: 2 };
+    return priority[a.direction] - priority[b.direction];
   }
 
   // close tags in the opposite order they have been opened

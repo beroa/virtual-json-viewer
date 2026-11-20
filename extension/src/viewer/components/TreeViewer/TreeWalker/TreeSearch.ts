@@ -61,7 +61,12 @@ type SearchMatchBuilder = (
 ) => NodeSearchMatch;
 
 function searchMatchBuilder(search: Search): SearchMatchBuilder {
-  const searcher = buildSearcher(search.text, search.caseSensitive);
+  const searcher = buildSearcher(
+    search.text,
+    search.caseSensitive,
+    search.wholeWord,
+    search.regex,
+  );
 
   function matchKey(key: Nullable<Json.Key>): SearchMatchRange[] {
     return typeof key === "string" ? searcher.findMatches(key) : [];

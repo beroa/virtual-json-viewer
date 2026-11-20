@@ -28,6 +28,9 @@ type SearchInputProps = Props<{
   setText: (text: string) => void;
   clearPreview: () => void;
   commitSearch: () => void;
+  toggleWholeWord: () => void;
+  toggleRegex: () => void;
+  invalidRegex: boolean;
 }>;
 
 export function SearchInput({
@@ -40,6 +43,9 @@ export function SearchInput({
   setText,
   clearPreview,
   commitSearch,
+  toggleWholeWord,
+  toggleRegex,
+  invalidRegex,
   className,
 }: SearchInputProps): JSX.Element {
   const t = useContext(TranslationContext);
@@ -90,6 +96,28 @@ export function SearchInput({
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      e.key.toLowerCase() === "w"
+    ) {
+      e.preventDefault();
+      toggleWholeWord();
+      return;
+    }
+    if (
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      e.key.toLowerCase() === "r"
+    ) {
+      e.preventDefault();
+      toggleRegex();
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       const [nextText, textChanged] = flushText();
@@ -140,6 +168,8 @@ export function SearchInput({
     <input
       ref={ref}
       type="input"
+      aria-invalid={invalidRegex}
+      title={invalidRegex ? t.toolbar.search.invalidRegex : undefined}
       className={classNames(
         "placeholder-input-foreground/50 focus:outline-hidden",
         className,
